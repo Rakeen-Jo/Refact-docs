@@ -1,35 +1,37 @@
 # 06. Sensor Timing Stabilization
 
 ## 목표
-- sensor read 성공률 향상
-- timeout/cut/dead 최소화
+- sensor read 성공률 상승
+- timeout(`Stmo`) / cut / dead 최소화
 - 포트별 편차(U1/U3/U4/U6) 관리
 
-## 관측된 패턴
-- U3/U4/U6는 `SRtx≈SRdone`, `Stmo/cut/dead≈0`로 안정화되는 구간 확인
-- U1은 상대적으로 `Stmo/cut/dead/UErr` 누적이 크게 발생하는 시점 존재
+## 최근 관측 요약
+- U3/U4/U6: `SRtx≈SRdone`, `Stmo/cut/dead` 거의 0으로 수렴하는 구간 확인
+- U1: 간헐적으로 `Stmo/cut/dead/UErr` 증가가 집중
 
-## 원인 후보
-1. U1 물리 링크 품질(배선/그라운드/트랜시버 편차)
-2. half-duplex turnaround 타이밍 미스
-3. 늦은 응답이 다음 cycle과 충돌하는 케이스
+## 카운터 의미 (중요)
+- `Stmo`: sensor timeout 누적
+- `cut`: 센서 라운드 중단(abort/late-cut 포함)
+- `dead`: RX deadlock watchdog 개입 횟수
+- `UErr`: UART error recover 횟수
+- `Sid/Slen`: 마지막 유효 sensor ID/길이
 
-## 적용된 대응 (ESP-IDF 센서 펌웨어 측)
-- TX_DONE stale clear
-- turnaround delay 보강
-- explicit reply delay (`REPLY_DELAY_US`)
+## ESP-IDF 센서 FW 대응 내역
+- turnaround delay
+- stale TX_DONE clear
+- explicit reply delay
 - late-cut (`REPLY_LATE_US`)
 - TX_DONE lost/stuck guard
 
-## 해석 가이드
-- `Sid`는 마지막 성공 sensor ID이므로 포트별로 다르게 찍혀도 정상
-- `dead`는 단순 timeout이 아니라 RX deadlock watchdog 개입 카운터
-- `UErr`와 `dead`가 같이 증가하면 recover 타이밍 꼬임 가능성 큼
+## 해석 규칙
+1. 절대값이 아니라 interval delta(증가량)로 본다
+2. `UErr`와 `dead` 동반 상승 시 recover 타이밍/라인 품질 이슈 우선
+3. `Sid`는 마지막 성공 ID이므로 포트별로 달라도 정상
 
 ## 포트별 기록 템플릿
-| Port | SRtx | SRdone | Stmo | cut | dead | UErr | 비고 |
-|---|---:|---:|---:|---:|---:|---:|---|
-| U1 |  |  |  |  |  |  |  |
-| U3 |  |  |  |  |  |  |  |
-| U4 |  |  |  |  |  |  |  |
-| U6 |  |  |  |  |  |  |  |
+| Port | SRtx | SRdone | Stmo | cut | dead | UErr | Sid | 비고 |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| U1 |  |  |  |  |  |  |  |  |
+| U3 |  |  |  |  |  |  |  |  |
+| U4 |  |  |  |  |  |  |  |  |
+| U6 |  |  |  |  |  |  |  |  |

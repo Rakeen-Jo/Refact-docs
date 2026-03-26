@@ -14,7 +14,8 @@
 9. `09_Debug_Menu_TermPrint_Monitor.md`
 10. `10_Watchdog_Recovery_Fault_Handling.md`
 11. `11_Bug_Timeline_and_Fix_Map.md`
-12. `99_Appendix_Diff_and_Commits.md`
+12. `12_Diff_Inventory_Before_vs_After.md`
+13. `99_Appendix_Diff_and_Commits.md`
 
 ## DB(데이터베이스) 3개
 - Change Log DB
