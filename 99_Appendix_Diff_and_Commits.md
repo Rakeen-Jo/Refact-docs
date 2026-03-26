@@ -9,12 +9,29 @@
 # 1) 디렉터리 비교( .git 제외 )
 diff -ruN --exclude=.git work/02_V5B2_SENSE work/02_V5B2_SENSE_Refact_2ea0133 > /tmp/v5b2_full.diff
 
-# 2) 핵심 파일 비교
-diff -u work/02_V5B2_SENSE/V5B2/Src/motor_ctrl.c work/02_V5B2_SENSE_Refact_2ea0133/V5B2/Src/motor_ctrl.c
+# 2) 변경 파일 목록 요약
+diff -rq --exclude=.git work/02_V5B2_SENSE work/02_V5B2_SENSE_Refact_2ea0133
 
-diff -u work/02_V5B2_SENSE/V5B2/Src/motor_xc330_dma.c work/02_V5B2_SENSE_Refact_2ea0133/V5B2/Src/motor_xc330_dma.c
-
+# 3) 핵심 파일 비교
 diff -u work/02_V5B2_SENSE/Core/Src/main.c work/02_V5B2_SENSE_Refact_2ea0133/Core/Src/main.c
+
+diff -u work/02_V5B2_SENSE/Core/Src/xc330-t181-dma.c work/02_V5B2_SENSE_Refact_2ea0133/V5B2/Src/motor_xc330_dma.c
+
+diff -u work/02_V5B2_SENSE/Core/Src/xc330-t181.c work/02_V5B2_SENSE_Refact_2ea0133/V5B2/Src/motor_xc330.c
+
+diff -u work/02_V5B2_SENSE/Core/Src/Interface.c work/02_V5B2_SENSE_Refact_2ea0133/V5B2/Src/can_comm.c
+```
+
+## 함수 목록 자동 추출(빠른 맵핑용)
+```bash
+python3 - << 'PY'
+import re, pathlib
+p='work/02_V5B2_SENSE_Refact_2ea0133/V5B2/Src/motor_xc330_dma.c'
+pat=re.compile(r'^\s*(?:static\s+)?(?:inline\s+)?(?:void|bool|int|uint\w+_t|BaseType_t|HAL_StatusTypeDef)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(')
+for line in pathlib.Path(p).read_text(errors='ignore').splitlines():
+    m=pat.match(line)
+    if m: print(m.group(1))
+PY
 ```
 
 ## 우선 점검 파일(Refact)
