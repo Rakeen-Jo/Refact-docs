@@ -1,6 +1,7 @@
 using System.IO.Ports;
 using System.Text;
 using System.Text.Json;
+using System.Runtime.InteropServices;
 
 namespace V5B2_IAP_Updater_UI;
 
@@ -12,10 +13,8 @@ public class MainForm : Form
     private readonly Button _btnRefresh = new() { Text = "Refresh" };
     private readonly Button _btnConnect = new() { Text = "Open Port" };
     private readonly Button _btnBrowse = new() { Text = "Browse BIN" };
-    private readonly Button _btnEnterIap = new() { Text = "Enter IAP" };
     private readonly Button _btnStart = new() { Text = "Start Download" };
     private readonly Button _btnCancel = new() { Text = "Cancel", Enabled = false };
-    private readonly TextBox _tbResetCmd = new() { Text = "reset" };
     private readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 100 };
     private readonly TextBox _tbLog = new() { Multiline = true, ScrollBars = ScrollBars.Vertical, ReadOnly = true };
 
@@ -23,6 +22,7 @@ public class MainForm : Form
     private SerialPort? _openedPort;
 
     private const string Password = "wonik1234";
+    private const string ResetCmd = "reset";
 
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -78,7 +78,7 @@ public class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 4,
-            RowCount = 6,
+            RowCount = 5,
             Padding = new Padding(12),
             AutoSize = false
         };
@@ -91,7 +91,6 @@ public class MainForm : Form
         var lblPort = new Label { Text = "Serial Port", AutoSize = true, Anchor = AnchorStyles.Left, TextAlign = ContentAlignment.MiddleLeft };
         var lblBaud = new Label { Text = "Baud", AutoSize = true, Anchor = AnchorStyles.Left, TextAlign = ContentAlignment.MiddleLeft };
         var lblBin = new Label { Text = "Firmware BIN", AutoSize = true, Anchor = AnchorStyles.Left, TextAlign = ContentAlignment.MiddleLeft };
-        var lblReset = new Label { Text = "Reset Cmd", AutoSize = true, Anchor = AnchorStyles.Left, TextAlign = ContentAlignment.MiddleLeft };
 
         _cbPort.Dock = DockStyle.Fill;
         _cbBaud.Dock = DockStyle.Fill;
@@ -99,8 +98,6 @@ public class MainForm : Form
         _btnRefresh.Dock = DockStyle.Fill;
         _btnConnect.Dock = DockStyle.Fill;
         _btnBrowse.Dock = DockStyle.Fill;
-        _btnEnterIap.Dock = DockStyle.Fill;
-        _tbResetCmd.Dock = DockStyle.Fill;
         _btnStart.Dock = DockStyle.Fill;
         _btnCancel.Dock = DockStyle.Fill;
         _progress.Dock = DockStyle.Fill;
@@ -120,17 +117,12 @@ public class MainForm : Form
         layout.SetColumnSpan(_tbFile, 2);
         layout.Controls.Add(_btnBrowse, 3, 2);
 
-        layout.Controls.Add(lblReset, 0, 3);
-        layout.Controls.Add(_tbResetCmd, 1, 3);
-        layout.Controls.Add(_btnEnterIap, 2, 3);
+        layout.Controls.Add(_btnStart, 1, 3);
+        layout.Controls.Add(_btnCancel, 2, 3);
+        layout.Controls.Add(_progress, 3, 3);
 
-        layout.Controls.Add(_btnStart, 1, 4);
-        layout.Controls.Add(_btnCancel, 2, 4);
-        layout.Controls.Add(_progress, 3, 4);
-
-        layout.Controls.Add(_tbLog, 0, 5);
+        layout.Controls.Add(_tbLog, 0, 4);
         layout.SetColumnSpan(_tbLog, 4);
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
@@ -150,13 +142,13 @@ public class MainForm : Form
         _btnRefresh.Click += (_, _) => RefreshPorts();
         _btnConnect.Click += (_, _) => TogglePortOpenClose();
         _btnBrowse.Click += (_, _) => BrowseBin();
-        _btnEnterIap.Click += (_, _) => EnterIapOnly();
         _btnStart.Click += async (_, _) => await StartAsync();
         _btnCancel.Click += (_, _) => _cts?.Cancel();
         FormClosing += (_, _) => CloseOpenedPort();
 
         RefreshPorts();
         LoadSettings();
+        ApplyBrandIcon();
     }
 
     private void Ui(Action action)
@@ -222,36 +214,12 @@ public class MainForm : Form
         Ui(() => _btnConnect.Text = "Open Port");
     }
 
-    private void EnterIapOnly()
-    {
-        if (_openedPort is null || !_openedPort.IsOpen)
-        {
-            Log("[ERR] Open COM port first.");
-            return;
-        }
-
-        try
-        {
-            lock (_openedPort)
-            {
-                AutoEnterIap(_openedPort, CancellationToken.None);
-            }
-        }
-        catch (Exception ex)
-        {
-            Log("[ERR] Enter IAP failed: " + ex.Message);
-        }
-    }
-
     private void AutoEnterIap(SerialPort port, CancellationToken ct)
     {
-        string cmd = _tbResetCmd.Text?.Trim() ?? string.Empty;
-        if (!string.IsNullOrEmpty(cmd))
-        {
-            Send(port, cmd + "\r");
-            Thread.Sleep(120);
-            Log($"[IAP] reset cmd sent: {cmd}");
-        }
+        string cmd = ResetCmd;
+        Send(port, cmd + "\r");
+        Thread.Sleep(120);
+        Log($"[IAP] reset cmd sent: {cmd}");
 
         // Watch boot text and inject SPACE on "Booting" prompt.
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -461,8 +429,6 @@ public class MainForm : Form
             _btnRefresh.Enabled = enabled;
             _btnBrowse.Enabled = enabled;
             _btnConnect.Enabled = enabled;
-            _btnEnterIap.Enabled = enabled;
-            _tbResetCmd.Enabled = enabled;
             _btnCancel.Enabled = !enabled;
             _cbPort.Enabled = enabled;
             _cbBaud.Enabled = enabled;
@@ -474,6 +440,31 @@ public class MainForm : Form
     private void Log(string msg)
     {
         Ui(() => _tbLog.AppendText($"[{DateTime.Now:HH:mm:ss}] {msg}{Environment.NewLine}"));
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool DestroyIcon(IntPtr hIcon);
+
+    private void ApplyBrandIcon()
+    {
+        try
+        {
+            var logoPath = Path.Combine(AppContext.BaseDirectory, "assets", "wonik_logo.png");
+            if (!File.Exists(logoPath)) return;
+
+            using var bmp = new Bitmap(logoPath);
+            IntPtr hIcon = bmp.GetHicon();
+            try
+            {
+                using var tmp = Icon.FromHandle(hIcon);
+                Icon = (Icon)tmp.Clone();
+            }
+            finally
+            {
+                DestroyIcon(hIcon);
+            }
+        }
+        catch { }
     }
 
     private void SaveSettings()

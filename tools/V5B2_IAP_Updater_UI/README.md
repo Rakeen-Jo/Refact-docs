@@ -6,8 +6,7 @@
 - Baud 선택 (기본 921600)
 - BIN 파일 로컬 선택
 - 마지막 BIN 경로 자동 저장/복원
-- Reset Cmd 입력 + 자동 IAP 진입(boot text 감지 + space 주입)
-- `Enter IAP` 버튼으로 수동 선진입도 가능
+- 자동 IAP 진입(내부 reset 명령 + boot text 감지 + space 주입)
 - Start Download / Cancel 버튼
 - 진행률 표시 + 로그 창
 - 전송 실패 시 자동 재시도(최대 3회)
