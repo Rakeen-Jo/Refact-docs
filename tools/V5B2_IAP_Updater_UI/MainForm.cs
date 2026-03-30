@@ -438,13 +438,13 @@ public class MainForm : Form
 
             if (first.Contains("Input Password", StringComparison.OrdinalIgnoreCase))
             {
-                Send(port, Password + "\r");
-                string pw = WaitAnyContains(port, 6000, ct, "Main Menu", "Wrong Password");
+                SendPassword(port);
+                string pw = WaitAnyContains(port, 8000, ct, "Main Menu", "Wrong Password");
                 if (pw.Contains("Wrong Password", StringComparison.OrdinalIgnoreCase))
                 {
                     // one immediate retry for occasional line corruption
-                    Send(port, Password + "\r");
-                    WaitContains(port, "Main Menu", 6000, ct);
+                    SendPassword(port);
+                    WaitContains(port, "Main Menu", 8000, ct);
                 }
                 Send(port, "1");
                 WaitContains(port, "Waiting for the file", 6000, ct);
@@ -464,6 +464,21 @@ public class MainForm : Form
     }
 
     private static void Send(SerialPort port, string s) => port.Write(s);
+
+    private void SendPassword(SerialPort port)
+    {
+        // Remove residual spaces/newlines that may have been injected during boot-break.
+        try { port.DiscardInBuffer(); } catch { }
+        Thread.Sleep(30);
+
+        foreach (char ch in Password)
+        {
+            Send(port, ch.ToString());
+            Thread.Sleep(4);
+        }
+        Send(port, "\r");
+        Log("[IAP] password sent");
+    }
 
     private void WaitContains(SerialPort port, string token, int timeoutMs, CancellationToken ct)
     {
