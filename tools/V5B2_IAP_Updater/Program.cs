@@ -54,8 +54,6 @@ internal static class Program
                     try { port.DiscardInBuffer(); } catch { }
                     SendText(port, "\r\n"); Thread.Sleep(20);
                     SendText(port, "\r\n"); Thread.Sleep(20);
-                    SendText(port, "MON OFF\r\n"); Thread.Sleep(60);
-                    SendText(port, "MON OFF\r\n"); Thread.Sleep(60);
                     SendText(port, "RESET\r\n");
                     Thread.Sleep(350);
                     for (int i = 0; i < 20; i++) { SendText(port, " "); Thread.Sleep(50); }

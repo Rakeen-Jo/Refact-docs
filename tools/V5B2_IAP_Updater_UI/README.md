@@ -14,7 +14,7 @@
 - 토큰 타임아웃 시 수신 tail 로그 출력
 
 자동 시퀀스:
-1. pre-clean (`\r\n`), `MON OFF` 2회
+1. pre-clean (`\r\n`)
 2. `RESET` 전송
 3. SPACE burst (boot countdown break)
 4. `Input Password`/`Main Menu`/`Waiting for the file` 토큰 감지

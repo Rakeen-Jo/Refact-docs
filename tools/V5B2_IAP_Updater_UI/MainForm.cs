@@ -233,16 +233,10 @@ public class MainForm : Form
         Send(port, "\r\n");
         Thread.Sleep(20);
 
-        // Quiet monitor output before reset (best effort).
-        Send(port, "MON OFF\r\n");
-        Thread.Sleep(60);
-        Send(port, "MON OFF\r\n");
-        Thread.Sleep(60);
-
         string cmd = ResetCmd;
         Send(port, cmd + "\r\n");
         Thread.Sleep(350);
-        Log($"[IAP] pre-cmd: MON OFF x2, reset cmd sent: {cmd}");
+        Log($"[IAP] reset cmd sent: {cmd}");
 
         // Watch boot text and inject SPACE on "Booting" prompt.
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -382,6 +376,7 @@ public class MainForm : Form
             // Auto-enter IAP: reset command + boot text watch + space injection
             AutoEnterIap(port, ct);
 
+            Log("[IAP] waiting for password/menu/file token...");
             string first = WaitAnyContains(port, 12000, ct, "Input Password", "Main Menu", "Waiting for the file");
 
             if (first.Contains("Input Password", StringComparison.OrdinalIgnoreCase))

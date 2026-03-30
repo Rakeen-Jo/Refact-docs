@@ -34,6 +34,7 @@ internal sealed class YModemSender
 
         int pktNo = 1;
         int offset = 0;
+        int lastLogPct = -1;
         while (offset < file.Length)
         {
             ct.ThrowIfCancellationRequested();
@@ -50,7 +51,13 @@ internal sealed class YModemSender
 
             offset += size;
             pktNo = (pktNo + 1) & 0xFF;
-            _progress((int)((offset * 100L) / file.Length));
+            int pct = (int)((offset * 100L) / file.Length);
+            _progress(pct);
+            if (pct / 5 != lastLogPct / 5)
+            {
+                _log($"[YMODEM] progress {pct}%");
+                lastLogPct = pct;
+            }
         }
 
         _port.Write(new[] { EOT }, 0, 1);
