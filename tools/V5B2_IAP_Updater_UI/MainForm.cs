@@ -218,7 +218,7 @@ public class MainForm : Form
     {
         string cmd = ResetCmd;
         Send(port, cmd + "\r\n");
-        Thread.Sleep(120);
+        Thread.Sleep(350);
         Log($"[IAP] reset cmd sent: {cmd}");
 
         // Watch boot text and inject SPACE on "Booting" prompt.
