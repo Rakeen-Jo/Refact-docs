@@ -12,8 +12,10 @@ public class MainForm : Form
     private readonly Button _btnRefresh = new() { Text = "Refresh" };
     private readonly Button _btnConnect = new() { Text = "Open Port" };
     private readonly Button _btnBrowse = new() { Text = "Browse BIN" };
+    private readonly Button _btnEnterIap = new() { Text = "Enter IAP" };
     private readonly Button _btnStart = new() { Text = "Start Download" };
     private readonly Button _btnCancel = new() { Text = "Cancel", Enabled = false };
+    private readonly TextBox _tbResetCmd = new() { Text = "reset" };
     private readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 100 };
     private readonly TextBox _tbLog = new() { Multiline = true, ScrollBars = ScrollBars.Vertical, ReadOnly = true };
 
@@ -40,11 +42,43 @@ public class MainForm : Form
         MinimumSize = new Size(900, 560);
         StartPosition = FormStartPosition.CenterScreen;
 
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Padding = new Padding(0),
+            AutoSize = false
+        };
+
+        var header = new Panel { Dock = DockStyle.Fill, Height = 72, BackColor = Color.White };
+        var logoPath = Path.Combine(AppContext.BaseDirectory, "assets", "wonik_logo.png");
+        if (File.Exists(logoPath))
+        {
+            var pic = new PictureBox
+            {
+                Image = Image.FromFile(logoPath),
+                SizeMode = PictureBoxSizeMode.Zoom,
+                Location = new Point(12, 8),
+                Size = new Size(220, 56)
+            };
+            header.Controls.Add(pic);
+        }
+        var title = new Label
+        {
+            Text = "V5B2 IAP Updater",
+            Font = new Font("Segoe UI", 16, FontStyle.Bold),
+            ForeColor = Color.FromArgb(0, 56, 140),
+            AutoSize = true,
+            Location = new Point(250, 22)
+        };
+        header.Controls.Add(title);
+
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 4,
-            RowCount = 5,
+            RowCount = 6,
             Padding = new Padding(12),
             AutoSize = false
         };
@@ -57,6 +91,7 @@ public class MainForm : Form
         var lblPort = new Label { Text = "Serial Port", AutoSize = true, Anchor = AnchorStyles.Left, TextAlign = ContentAlignment.MiddleLeft };
         var lblBaud = new Label { Text = "Baud", AutoSize = true, Anchor = AnchorStyles.Left, TextAlign = ContentAlignment.MiddleLeft };
         var lblBin = new Label { Text = "Firmware BIN", AutoSize = true, Anchor = AnchorStyles.Left, TextAlign = ContentAlignment.MiddleLeft };
+        var lblReset = new Label { Text = "Reset Cmd", AutoSize = true, Anchor = AnchorStyles.Left, TextAlign = ContentAlignment.MiddleLeft };
 
         _cbPort.Dock = DockStyle.Fill;
         _cbBaud.Dock = DockStyle.Fill;
@@ -64,6 +99,8 @@ public class MainForm : Form
         _btnRefresh.Dock = DockStyle.Fill;
         _btnConnect.Dock = DockStyle.Fill;
         _btnBrowse.Dock = DockStyle.Fill;
+        _btnEnterIap.Dock = DockStyle.Fill;
+        _tbResetCmd.Dock = DockStyle.Fill;
         _btnStart.Dock = DockStyle.Fill;
         _btnCancel.Dock = DockStyle.Fill;
         _progress.Dock = DockStyle.Fill;
@@ -83,19 +120,29 @@ public class MainForm : Form
         layout.SetColumnSpan(_tbFile, 2);
         layout.Controls.Add(_btnBrowse, 3, 2);
 
-        layout.Controls.Add(_btnStart, 1, 3);
-        layout.Controls.Add(_btnCancel, 2, 3);
-        layout.Controls.Add(_progress, 3, 3);
+        layout.Controls.Add(lblReset, 0, 3);
+        layout.Controls.Add(_tbResetCmd, 1, 3);
+        layout.Controls.Add(_btnEnterIap, 2, 3);
 
-        layout.Controls.Add(_tbLog, 0, 4);
+        layout.Controls.Add(_btnStart, 1, 4);
+        layout.Controls.Add(_btnCancel, 2, 4);
+        layout.Controls.Add(_progress, 3, 4);
+
+        layout.Controls.Add(_tbLog, 0, 5);
         layout.SetColumnSpan(_tbLog, 4);
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-        Controls.Add(layout);
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.Controls.Add(header, 0, 0);
+        root.Controls.Add(layout, 0, 1);
+
+        Controls.Add(root);
 
         _cbBaud.Items.AddRange(new object[] { "921600", "460800", "2000000", "115200" });
         _cbBaud.SelectedIndex = 0;
@@ -103,6 +150,7 @@ public class MainForm : Form
         _btnRefresh.Click += (_, _) => RefreshPorts();
         _btnConnect.Click += (_, _) => TogglePortOpenClose();
         _btnBrowse.Click += (_, _) => BrowseBin();
+        _btnEnterIap.Click += (_, _) => EnterIapOnly();
         _btnStart.Click += async (_, _) => await StartAsync();
         _btnCancel.Click += (_, _) => _cts?.Cancel();
         FormClosing += (_, _) => CloseOpenedPort();
@@ -172,6 +220,39 @@ public class MainForm : Form
         }
         catch { }
         Ui(() => _btnConnect.Text = "Open Port");
+    }
+
+    private void EnterIapOnly()
+    {
+        if (_openedPort is null || !_openedPort.IsOpen)
+        {
+            Log("[ERR] Open COM port first.");
+            return;
+        }
+
+        try
+        {
+            lock (_openedPort)
+            {
+                string cmd = _tbResetCmd.Text?.Trim() ?? string.Empty;
+                if (!string.IsNullOrEmpty(cmd))
+                {
+                    Send(_openedPort, cmd + "\r");
+                    Thread.Sleep(120);
+                    Log($"[IAP] reset cmd sent: {cmd}");
+                }
+                for (int i = 0; i < 20; i++)
+                {
+                    Send(_openedPort, " ");
+                    Thread.Sleep(50);
+                }
+                Log("[IAP] space burst sent.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log("[ERR] Enter IAP failed: " + ex.Message);
+        }
     }
 
     private void BrowseBin()
@@ -270,15 +351,24 @@ public class MainForm : Form
             port.DiscardOutBuffer();
             Log($"[IAP] using {port.PortName} @ {port.BaudRate}");
 
+            // Try app-side soft reset command first (optional)
+            string cmd = _tbResetCmd.Text?.Trim() ?? string.Empty;
+            if (!string.IsNullOrEmpty(cmd))
+            {
+                Send(port, cmd + "\r");
+                Thread.Sleep(120);
+                Log($"[IAP] reset cmd sent: {cmd}");
+            }
+
             // Boot-break robustness: spam SPACE during a short window.
             // If app already in menu/password state, token matcher below handles it.
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 24; i++)
             {
                 Send(port, " ");
                 Thread.Sleep(50);
             }
 
-            string first = WaitAnyContains(port, 9000, ct, "Input Password", "Main Menu", "Waiting for the file");
+            string first = WaitAnyContains(port, 12000, ct, "Input Password", "Main Menu", "Waiting for the file");
 
             if (first.Contains("Input Password", StringComparison.OrdinalIgnoreCase))
             {
@@ -335,7 +425,9 @@ public class MainForm : Form
             catch (TimeoutException) { }
         }
 
-        throw new TimeoutException($"Timeout waiting token: {string.Join(" | ", tokens)}");
+        string tail = sb.ToString();
+        if (tail.Length > 300) tail = tail[^300..];
+        throw new TimeoutException($"Timeout waiting token: {string.Join(" | ", tokens)} | tail='{tail.Replace("\r", "\\r").Replace("\n", "\\n")}'");
     }
 
     private void ToggleUi(bool enabled)
@@ -346,6 +438,8 @@ public class MainForm : Form
             _btnRefresh.Enabled = enabled;
             _btnBrowse.Enabled = enabled;
             _btnConnect.Enabled = enabled;
+            _btnEnterIap.Enabled = enabled;
+            _tbResetCmd.Enabled = enabled;
             _btnCancel.Enabled = !enabled;
             _cbPort.Enabled = enabled;
             _cbBaud.Enabled = enabled;
