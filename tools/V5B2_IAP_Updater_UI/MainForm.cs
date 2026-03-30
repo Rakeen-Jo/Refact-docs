@@ -54,7 +54,7 @@ public class MainForm : Form
         };
 
         var header = new Panel { Dock = DockStyle.Fill, Height = 72, BackColor = Color.White };
-        var logoPath = Path.Combine(AppContext.BaseDirectory, "assets", "wonik_logo.png");
+        var logoPath = Path.Combine(AppContext.BaseDirectory, "assets", "wonik_mark.jpg");
         if (File.Exists(logoPath))
         {
             var pic = new PictureBox
@@ -561,7 +561,7 @@ public class MainForm : Form
     {
         try
         {
-            var logoPath = Path.Combine(AppContext.BaseDirectory, "assets", "wonik_logo.png");
+            var logoPath = Path.Combine(AppContext.BaseDirectory, "assets", "wonik_mark.jpg");
             if (!File.Exists(logoPath)) return;
 
             using var bmp = new Bitmap(logoPath);
