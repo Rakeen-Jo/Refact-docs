@@ -63,9 +63,22 @@ public sealed class SerialMonitorForm : Form
 
             if (!string.IsNullOrEmpty(incoming))
             {
+                bool stickToBottom = (_rxBox.SelectionStart >= _rxBox.TextLength - 8) ||
+                                    (_rxBox.GetPositionFromCharIndex(_rxBox.TextLength).Y - _rxBox.ClientSize.Height < 24);
+
                 _rxBox.AppendText(incoming);
-                _rxBox.SelectionStart = _rxBox.TextLength;
-                _rxBox.ScrollToCaret();
+
+                if (_rxBox.TextLength > 300000)
+                {
+                    _rxBox.Select(0, 120000);
+                    _rxBox.SelectedText = string.Empty;
+                }
+
+                if (stickToBottom)
+                {
+                    _rxBox.SelectionStart = _rxBox.TextLength;
+                    _rxBox.ScrollToCaret();
+                }
             }
         }
         catch { }

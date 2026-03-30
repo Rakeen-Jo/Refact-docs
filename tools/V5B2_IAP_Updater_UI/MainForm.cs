@@ -228,37 +228,56 @@ public class MainForm : Form
     {
         // Pre-clean line noise / partial tokens before sending real commands.
         try { port.DiscardInBuffer(); } catch { }
-        Send(port, "\r\n");
+
+        // Try to escape current CLI line, then issue RESET robustly.
+        Send(port, "\x03"); // Ctrl+C
         Thread.Sleep(20);
         Send(port, "\r\n");
         Thread.Sleep(20);
 
         string cmd = ResetCmd;
         Send(port, cmd + "\r\n");
+        Thread.Sleep(80);
+        Send(port, cmd + "\r\n");
         Thread.Sleep(350);
-        Log($"[IAP] reset cmd sent: {cmd}");
+        Log($"[IAP] reset cmd sent x2: {cmd}");
 
-        // Watch boot text and inject SPACE on "Booting" prompt.
+        // Watch boot text and inject SPACE on boot window.
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var sb = new StringBuilder();
+        var line = new StringBuilder();
         long nextSpaceMs = 0;
 
-        while (sw.ElapsedMilliseconds < 7000)
+        while (sw.ElapsedMilliseconds < 9000)
         {
             ct.ThrowIfCancellationRequested();
 
             if (sw.ElapsedMilliseconds >= nextSpaceMs)
             {
                 Send(port, " ");
-                nextSpaceMs = sw.ElapsedMilliseconds + 150;
+                nextSpaceMs = sw.ElapsedMilliseconds + 120;
             }
 
             try
             {
                 int b = port.ReadByte();
                 if (b < 0) continue;
-                sb.Append((char)b);
-                if (sb.Length > 4000) sb.Remove(0, sb.Length - 2000);
+                char ch = (char)b;
+                sb.Append(ch);
+                if (sb.Length > 6000) sb.Remove(0, sb.Length - 3000);
+
+                if (ch == '\n' || ch == '\r')
+                {
+                    if (line.Length > 0)
+                    {
+                        Log("[RX] " + line.ToString());
+                        line.Clear();
+                    }
+                }
+                else if (line.Length < 180)
+                {
+                    line.Append(ch);
+                }
 
                 string s = sb.ToString();
                 if (s.Contains("Booting", StringComparison.OrdinalIgnoreCase) ||
