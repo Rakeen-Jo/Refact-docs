@@ -226,10 +226,23 @@ public class MainForm : Form
 
     private void AutoEnterIap(SerialPort port, CancellationToken ct)
     {
+        // Pre-clean line noise / partial tokens before sending real commands.
+        try { port.DiscardInBuffer(); } catch { }
+        Send(port, "\r\n");
+        Thread.Sleep(20);
+        Send(port, "\r\n");
+        Thread.Sleep(20);
+
+        // Quiet monitor output before reset (best effort).
+        Send(port, "MON OFF\r\n");
+        Thread.Sleep(60);
+        Send(port, "MON OFF\r\n");
+        Thread.Sleep(60);
+
         string cmd = ResetCmd;
         Send(port, cmd + "\r\n");
         Thread.Sleep(350);
-        Log($"[IAP] reset cmd sent: {cmd}");
+        Log($"[IAP] pre-cmd: MON OFF x2, reset cmd sent: {cmd}");
 
         // Watch boot text and inject SPACE on "Booting" prompt.
         var sw = System.Diagnostics.Stopwatch.StartNew();

@@ -14,11 +14,11 @@
 - 토큰 타임아웃 시 수신 tail 로그 출력
 
 자동 시퀀스:
-1. SPACE 전송 (boot countdown break)
-2. `Input Password` 대기
-3. `wonik1234` 전송
-4. `Main Menu` 대기
-5. `1` 전송
+1. pre-clean (`\r\n`), `MON OFF` 2회
+2. `RESET` 전송
+3. SPACE burst (boot countdown break)
+4. `Input Password`/`Main Menu`/`Waiting for the file` 토큰 감지
+5. 필요 시 비밀번호 전송 + 메뉴 `1`
 6. YMODEM 전송
 7. 성공 문자열 대기
 
