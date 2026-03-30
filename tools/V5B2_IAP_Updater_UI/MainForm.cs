@@ -232,7 +232,7 @@ public class MainForm : Form
         Ui(() => _btnConnect.Text = "Open Port");
     }
 
-    private void AutoEnterIap(SerialPort port, CancellationToken ct)
+    private string AutoEnterIap(SerialPort port, CancellationToken ct)
     {
         // Pre-clean line noise / partial tokens before sending real commands.
         try { port.DiscardInBuffer(); } catch { }
@@ -286,20 +286,32 @@ public class MainForm : Form
                 }
 
                 string s = sb.ToString();
-                if (s.Contains("Booting", StringComparison.OrdinalIgnoreCase) ||
-                    s.Contains("Serial KEY [space] pressed", StringComparison.OrdinalIgnoreCase) ||
-                    s.Contains("Input Password", StringComparison.OrdinalIgnoreCase) ||
-                    s.Contains("Main Menu", StringComparison.OrdinalIgnoreCase) ||
-                    s.Contains("Waiting for the file", StringComparison.OrdinalIgnoreCase))
+                if (s.Contains("Waiting for the file", StringComparison.OrdinalIgnoreCase))
                 {
-                    Log("[IAP] boot/menu text detected.");
-                    return;
+                    Log("[IAP] boot/menu text detected: waiting-file");
+                    return "Waiting for the file";
+                }
+                if (s.Contains("Main Menu", StringComparison.OrdinalIgnoreCase))
+                {
+                    Log("[IAP] boot/menu text detected: main-menu");
+                    return "Main Menu";
+                }
+                if (s.Contains("Input Password", StringComparison.OrdinalIgnoreCase))
+                {
+                    Log("[IAP] boot/menu text detected: input-password");
+                    return "Input Password";
+                }
+                if (s.Contains("Booting", StringComparison.OrdinalIgnoreCase) ||
+                    s.Contains("Serial KEY [space] pressed", StringComparison.OrdinalIgnoreCase))
+                {
+                    Log("[IAP] boot countdown detected.");
                 }
             }
             catch (TimeoutException) { }
         }
 
         Log("[IAP] auto-enter window elapsed (continuing with token wait)...");
+        return string.Empty;
     }
 
     private void BrowseBin()
@@ -401,10 +413,13 @@ public class MainForm : Form
             Log($"[IAP] using {port.PortName} @ {port.BaudRate}");
 
             // Auto-enter IAP: reset command + boot text watch + space injection
-            AutoEnterIap(port, ct);
+            string first = AutoEnterIap(port, ct);
 
-            Log("[IAP] waiting for password/menu/file token...");
-            string first = WaitAnyContains(port, 12000, ct, "Input Password", "Main Menu", "Waiting for the file");
+            if (string.IsNullOrEmpty(first))
+            {
+                Log("[IAP] waiting for password/menu/file token...");
+                first = WaitAnyContains(port, 12000, ct, "Input Password", "Main Menu", "Waiting for the file");
+            }
 
             if (first.Contains("Input Password", StringComparison.OrdinalIgnoreCase))
             {

@@ -68,6 +68,7 @@ public sealed class SerialMonitorForm : Form
             if (!string.IsNullOrEmpty(incoming))
             {
                 bool stickToBottom = (_rxBox.SelectionStart >= _rxBox.TextLength - 8);
+                bool hasNewLine = incoming.Contains('\n') || incoming.Contains('\r');
 
                 _rxBox.AppendText(incoming);
 
@@ -77,7 +78,7 @@ public sealed class SerialMonitorForm : Form
                     _rxBox.SelectedText = string.Empty;
                 }
 
-                if (stickToBottom)
+                if (stickToBottom && hasNewLine)
                 {
                     _rxBox.SelectionStart = _rxBox.TextLength;
                     _rxBox.ScrollToCaret();
