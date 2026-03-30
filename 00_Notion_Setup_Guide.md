@@ -17,7 +17,8 @@
 12. `12_Diff_Inventory_Before_vs_After.md`
 13. `13_Function_Level_Diff_Map.md`
 14. `14_Validation_and_Release_Checklist.md`
-15. `99_Appendix_Diff_and_Commits.md`
+15. `15_IAP_Menu_Protocol_and_StateMachine.md`
+16. `99_Appendix_Diff_and_Commits.md`
 
 ## DB(데이터베이스) 3개
 - Change Log DB
