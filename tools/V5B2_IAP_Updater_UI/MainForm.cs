@@ -21,23 +21,48 @@ public class MainForm : Form
     public MainForm()
     {
         Text = "V5B2 IAP Updater";
-        Width = 860;
-        Height = 560;
+        Width = 980;
+        Height = 640;
+        MinimumSize = new Size(900, 560);
+        StartPosition = FormStartPosition.CenterScreen;
 
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 5, Padding = new Padding(8) };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 32));
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 4,
+            RowCount = 5,
+            Padding = new Padding(12),
+            AutoSize = false
+        };
 
-        layout.Controls.Add(new Label { Text = "Serial Port", AutoSize = true }, 0, 0);
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 260));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+        var lblPort = new Label { Text = "Serial Port", AutoSize = true, Anchor = AnchorStyles.Left, TextAlign = ContentAlignment.MiddleLeft };
+        var lblBaud = new Label { Text = "Baud", AutoSize = true, Anchor = AnchorStyles.Left, TextAlign = ContentAlignment.MiddleLeft };
+        var lblBin = new Label { Text = "Firmware BIN", AutoSize = true, Anchor = AnchorStyles.Left, TextAlign = ContentAlignment.MiddleLeft };
+
+        _cbPort.Dock = DockStyle.Fill;
+        _cbBaud.Dock = DockStyle.Fill;
+        _tbFile.Dock = DockStyle.Fill;
+        _btnRefresh.Dock = DockStyle.Fill;
+        _btnBrowse.Dock = DockStyle.Fill;
+        _btnStart.Dock = DockStyle.Fill;
+        _btnCancel.Dock = DockStyle.Fill;
+        _progress.Dock = DockStyle.Fill;
+        _tbLog.Dock = DockStyle.Fill;
+        _tbLog.Font = new Font("Consolas", 9f);
+
+        layout.Controls.Add(lblPort, 0, 0);
         layout.Controls.Add(_cbPort, 1, 0);
         layout.Controls.Add(_btnRefresh, 2, 0);
 
-        layout.Controls.Add(new Label { Text = "Baud", AutoSize = true }, 0, 1);
+        layout.Controls.Add(lblBaud, 0, 1);
         layout.Controls.Add(_cbBaud, 1, 1);
 
-        layout.Controls.Add(new Label { Text = "Firmware BIN", AutoSize = true }, 0, 2);
+        layout.Controls.Add(lblBin, 0, 2);
         layout.Controls.Add(_tbFile, 1, 2);
         layout.SetColumnSpan(_tbFile, 2);
         layout.Controls.Add(_btnBrowse, 3, 2);
@@ -48,10 +73,10 @@ public class MainForm : Form
 
         layout.Controls.Add(_tbLog, 0, 4);
         layout.SetColumnSpan(_tbLog, 4);
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         Controls.Add(layout);
