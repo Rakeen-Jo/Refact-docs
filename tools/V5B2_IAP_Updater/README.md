@@ -17,8 +17,12 @@ dotnet build
 
 ## Run
 ```bash
-dotnet run -- COM5 path/to/fw.bin 2000000
+dotnet run -- COM5 path/to/fw.bin 921600
 ```
+
+- 기본 baud는 921600 (인자 생략 시)
+- 전송 실패 시 자동 재시도(최대 3회)
+
 
 ## 참고
 - 대상 부트로더는 `F429_IAP` 코드 기준

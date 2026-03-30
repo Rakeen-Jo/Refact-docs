@@ -17,7 +17,7 @@ internal static class Program
 
         string portName = args[0];
         string filePath = args[1];
-        int baud = args.Length >= 3 ? int.Parse(args[2]) : 2_000_000;
+        int baud = args.Length >= 3 ? int.Parse(args[2]) : 921_600;
 
         if (!File.Exists(filePath))
         {
@@ -43,27 +43,47 @@ internal static class Program
 
             Console.WriteLine($"[IAP] Opened {portName} @ {baud}");
 
-            // 1) Break boot countdown with SPACE
-            SendText(port, " ");
+            const int maxAttempts = 3;
+            Exception? last = null;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    Console.WriteLine($"[IAP] attempt {attempt}/{maxAttempts}");
 
-            // 2) Wait password prompt, send password
-            WaitContains(port, "Input Password", 5000);
-            SendText(port, Password + "\r");
+                    for (int i = 0; i < 20; i++) { SendText(port, " "); Thread.Sleep(50); }
 
-            // 3) Wait menu and choose 1(download)
-            WaitContains(port, "Main Menu", 5000);
-            SendText(port, "1");
+                    string first = WaitAnyContains(port, 9000, "Input Password", "Main Menu", "Waiting for the file");
+                    if (first.Contains("Input Password", StringComparison.OrdinalIgnoreCase))
+                    {
+                        SendText(port, Password + "\r");
+                        WaitContains(port, "Main Menu", 5000);
+                        SendText(port, "1");
+                        WaitContains(port, "Waiting for the file", 5000);
+                    }
+                    else if (first.Contains("Main Menu", StringComparison.OrdinalIgnoreCase))
+                    {
+                        SendText(port, "1");
+                        WaitContains(port, "Waiting for the file", 5000);
+                    }
 
-            // 4) Wait ymodem ready prompt / 'C'
-            WaitContains(port, "Waiting for the file", 5000);
+                    var y = new YModemSender(port, Console.WriteLine);
+                    y.SendFile(filePath);
+                    WaitContains(port, "Programming Completed Successfully", 10000);
+                    Console.WriteLine("[IAP] SUCCESS");
+                    return 0;
+                }
+                catch (Exception ex)
+                {
+                    last = ex;
+                    Console.WriteLine($"[IAP] attempt failed: {ex.Message}");
+                    try { port.Write(new[] { (char)0x18, (char)0x18 }, 0, 2); } catch { }
+                    Thread.Sleep(300);
+                    try { port.DiscardInBuffer(); port.DiscardOutBuffer(); } catch { }
+                }
+            }
 
-            var y = new YModemSender(port, Console.WriteLine);
-            y.SendFile(filePath);
-
-            // 5) Wait success text
-            WaitContains(port, "Programming Completed Successfully", 8000);
-            Console.WriteLine("[IAP] SUCCESS");
-            return 0;
+            throw new Exception("Update failed after retries", last);
         }
         catch (Exception ex)
         {
@@ -79,6 +99,11 @@ internal static class Program
 
     private static void WaitContains(SerialPort port, string token, int timeoutMs)
     {
+        _ = WaitAnyContains(port, timeoutMs, token);
+    }
+
+    private static string WaitAnyContains(SerialPort port, int timeoutMs, params string[] tokens)
+    {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var sb = new StringBuilder();
 
@@ -91,11 +116,13 @@ internal static class Program
                 char c = (char)b;
                 sb.Append(c);
 
-                if (sb.Length > 8000)
-                    sb.Remove(0, sb.Length - 4000);
+                if (sb.Length > 12000)
+                    sb.Remove(0, sb.Length - 6000);
 
-                if (sb.ToString().Contains(token, StringComparison.OrdinalIgnoreCase))
-                    return;
+                string hay = sb.ToString();
+                foreach (var token in tokens)
+                    if (hay.Contains(token, StringComparison.OrdinalIgnoreCase))
+                        return token;
             }
             catch (TimeoutException)
             {
@@ -103,6 +130,6 @@ internal static class Program
             }
         }
 
-        throw new TimeoutException($"Timeout waiting token: {token}");
+        throw new TimeoutException($"Timeout waiting token: {string.Join(" | ", tokens)}");
     }
 }

@@ -3,11 +3,12 @@
 기능:
 - COM 포트 자동 인식 + 목록 선택
 - Open/Close Port 토글 버튼 (선점/열기 실패 메시지)
-- Baud 선택
+- Baud 선택 (기본 921600)
 - BIN 파일 로컬 선택
 - 마지막 BIN 경로 자동 저장/복원
 - Start Download / Cancel 버튼
 - 진행률 표시 + 로그 창
+- 전송 실패 시 자동 재시도(최대 3회)
 
 자동 시퀀스:
 1. SPACE 전송 (boot countdown break)

@@ -97,7 +97,7 @@ public class MainForm : Form
 
         Controls.Add(layout);
 
-        _cbBaud.Items.AddRange(new object[] { "2000000", "115200", "921600" });
+        _cbBaud.Items.AddRange(new object[] { "921600", "460800", "2000000", "115200" });
         _cbBaud.SelectedIndex = 0;
 
         _btnRefresh.Click += (_, _) => RefreshPorts();
@@ -209,7 +209,7 @@ public class MainForm : Form
         {
             string file = _tbFile.Text;
             SaveSettings();
-            await Task.Run(() => RunUpdate(_openedPort!, file, _cts.Token));
+            await Task.Run(() => RunUpdateWithRetry(_openedPort!, file, _cts.Token));
             Log("[OK] Update completed.");
             _progress.Value = 100;
         }
@@ -227,6 +227,39 @@ public class MainForm : Form
             _cts = null;
             ToggleUi(true);
         }
+    }
+
+    private void RunUpdateWithRetry(SerialPort port, string filePath, CancellationToken ct)
+    {
+        const int maxAttempts = 3;
+        Exception? last = null;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                Log($"[IAP] attempt {attempt}/{maxAttempts}");
+                RunUpdate(port, filePath, ct);
+                return;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                last = ex;
+                Log($"[IAP] attempt {attempt} failed: {ex.Message}");
+
+                // Try to reset YMODEM state on target side (CAN x2)
+                try { port.Write(new[] { (char)0x18, (char)0x18 }, 0, 2); } catch { }
+                Thread.Sleep(300);
+                try { port.DiscardInBuffer(); port.DiscardOutBuffer(); } catch { }
+
+                if (attempt < maxAttempts)
+                    Log("[IAP] retrying...");
+            }
+        }
+
+        throw new Exception($"Update failed after {maxAttempts} attempts", last);
     }
 
     private void RunUpdate(SerialPort port, string filePath, CancellationToken ct)
