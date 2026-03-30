@@ -1,5 +1,6 @@
 using System.IO.Ports;
 using System.Text;
+using System.Text.Json;
 
 namespace V5B2_IAP_Updater_UI;
 
@@ -9,6 +10,7 @@ public class MainForm : Form
     private readonly ComboBox _cbBaud = new() { DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly TextBox _tbFile = new() { ReadOnly = true };
     private readonly Button _btnRefresh = new() { Text = "Refresh" };
+    private readonly Button _btnConnect = new() { Text = "Open Port" };
     private readonly Button _btnBrowse = new() { Text = "Browse BIN" };
     private readonly Button _btnStart = new() { Text = "Start Download" };
     private readonly Button _btnCancel = new() { Text = "Cancel", Enabled = false };
@@ -16,7 +18,19 @@ public class MainForm : Form
     private readonly TextBox _tbLog = new() { Multiline = true, ScrollBars = ScrollBars.Vertical, ReadOnly = true };
 
     private CancellationTokenSource? _cts;
+    private SerialPort? _openedPort;
+
     private const string Password = "wonik1234";
+
+    private static readonly string SettingsPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "V5B2_IAP_Updater_UI",
+        "settings.json");
+
+    private sealed class AppSettings
+    {
+        public string? LastBinPath { get; set; }
+    }
 
     public MainForm()
     {
@@ -48,6 +62,7 @@ public class MainForm : Form
         _cbBaud.Dock = DockStyle.Fill;
         _tbFile.Dock = DockStyle.Fill;
         _btnRefresh.Dock = DockStyle.Fill;
+        _btnConnect.Dock = DockStyle.Fill;
         _btnBrowse.Dock = DockStyle.Fill;
         _btnStart.Dock = DockStyle.Fill;
         _btnCancel.Dock = DockStyle.Fill;
@@ -58,6 +73,7 @@ public class MainForm : Form
         layout.Controls.Add(lblPort, 0, 0);
         layout.Controls.Add(_cbPort, 1, 0);
         layout.Controls.Add(_btnRefresh, 2, 0);
+        layout.Controls.Add(_btnConnect, 3, 0);
 
         layout.Controls.Add(lblBaud, 0, 1);
         layout.Controls.Add(_cbBaud, 1, 1);
@@ -85,11 +101,21 @@ public class MainForm : Form
         _cbBaud.SelectedIndex = 0;
 
         _btnRefresh.Click += (_, _) => RefreshPorts();
+        _btnConnect.Click += (_, _) => TogglePortOpenClose();
         _btnBrowse.Click += (_, _) => BrowseBin();
         _btnStart.Click += async (_, _) => await StartAsync();
         _btnCancel.Click += (_, _) => _cts?.Cancel();
+        FormClosing += (_, _) => CloseOpenedPort();
 
         RefreshPorts();
+        LoadSettings();
+    }
+
+    private void Ui(Action action)
+    {
+        if (IsDisposed) return;
+        if (InvokeRequired) BeginInvoke(action);
+        else action();
     }
 
     private void RefreshPorts()
@@ -97,6 +123,55 @@ public class MainForm : Form
         _cbPort.Items.Clear();
         foreach (var p in SerialPort.GetPortNames().OrderBy(x => x)) _cbPort.Items.Add(p);
         if (_cbPort.Items.Count > 0) _cbPort.SelectedIndex = 0;
+    }
+
+    private void TogglePortOpenClose()
+    {
+        if (_openedPort is { IsOpen: true })
+        {
+            CloseOpenedPort();
+            Log("[PORT] closed.");
+            return;
+        }
+
+        if (_cbPort.SelectedItem is null) { Log("[ERR] Select COM port."); return; }
+        if (!int.TryParse(_cbBaud.Text, out int baud)) { Log("[ERR] Invalid baud."); return; }
+
+        try
+        {
+            var p = new SerialPort((string)_cbPort.SelectedItem, baud, Parity.None, 8, StopBits.One)
+            {
+                ReadTimeout = 80,
+                WriteTimeout = 1000,
+                Encoding = Encoding.ASCII,
+                NewLine = "\r\n"
+            };
+            p.Open();
+            p.DiscardInBuffer();
+            p.DiscardOutBuffer();
+            _openedPort = p;
+            _btnConnect.Text = "Close Port";
+            Log($"[PORT] opened {_openedPort.PortName} @ {baud}");
+        }
+        catch (Exception ex)
+        {
+            Log("[ERR] Open failed (already in use?): " + ex.Message);
+        }
+    }
+
+    private void CloseOpenedPort()
+    {
+        try
+        {
+            if (_openedPort is not null)
+            {
+                if (_openedPort.IsOpen) _openedPort.Close();
+                _openedPort.Dispose();
+                _openedPort = null;
+            }
+        }
+        catch { }
+        Ui(() => _btnConnect.Text = "Open Port");
     }
 
     private void BrowseBin()
@@ -107,14 +182,24 @@ public class MainForm : Form
             Title = "Select firmware binary"
         };
         if (ofd.ShowDialog(this) == DialogResult.OK)
+        {
             _tbFile.Text = ofd.FileName;
+            SaveSettings();
+        }
     }
 
     private async Task StartAsync()
     {
-        if (_cbPort.SelectedItem is null) { Log("[ERR] Select COM port."); return; }
-        if (!int.TryParse(_cbBaud.Text, out int baud)) { Log("[ERR] Invalid baud."); return; }
-        if (string.IsNullOrWhiteSpace(_tbFile.Text) || !File.Exists(_tbFile.Text)) { Log("[ERR] Select BIN file."); return; }
+        if (_openedPort is null || !_openedPort.IsOpen)
+        {
+            Log("[ERR] Open COM port first.");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_tbFile.Text) || !File.Exists(_tbFile.Text))
+        {
+            Log("[ERR] Select BIN file.");
+            return;
+        }
 
         ToggleUi(false);
         _progress.Value = 0;
@@ -122,7 +207,9 @@ public class MainForm : Form
 
         try
         {
-            await Task.Run(() => RunUpdate((string)_cbPort.SelectedItem!, baud, _tbFile.Text, _cts.Token));
+            string file = _tbFile.Text;
+            SaveSettings();
+            await Task.Run(() => RunUpdate(_openedPort!, file, _cts.Token));
             Log("[OK] Update completed.");
             _progress.Value = 100;
         }
@@ -142,33 +229,26 @@ public class MainForm : Form
         }
     }
 
-    private void RunUpdate(string portName, int baud, string filePath, CancellationToken ct)
+    private void RunUpdate(SerialPort port, string filePath, CancellationToken ct)
     {
-        using var port = new SerialPort(portName, baud, Parity.None, 8, StopBits.One)
+        lock (port)
         {
-            ReadTimeout = 80,
-            WriteTimeout = 1000,
-            Encoding = Encoding.ASCII,
-            NewLine = "\r\n"
-        };
+            port.DiscardInBuffer();
+            port.DiscardOutBuffer();
+            Log($"[IAP] using {port.PortName} @ {port.BaudRate}");
 
-        port.Open();
-        port.DiscardInBuffer();
-        port.DiscardOutBuffer();
-        Log($"[IAP] Open {portName} @ {baud}");
+            Send(port, " ");
+            WaitContains(port, "Input Password", 6000, ct);
+            Send(port, Password + "\r");
+            WaitContains(port, "Main Menu", 6000, ct);
+            Send(port, "1");
+            WaitContains(port, "Waiting for the file", 6000, ct);
 
-        // state machine
-        Send(port, " ");
-        WaitContains(port, "Input Password", 6000, ct);
-        Send(port, Password + "\r");
-        WaitContains(port, "Main Menu", 6000, ct);
-        Send(port, "1");
-        WaitContains(port, "Waiting for the file", 6000, ct);
+            var y = new YModemSender(port, Log, SetProgress);
+            y.SendFile(filePath, ct);
 
-        var y = new YModemSender(port, Log, SetProgress);
-        y.SendFile(filePath, ct);
-
-        WaitContains(port, "Programming Completed Successfully", 12000, ct);
+            WaitContains(port, "Programming Completed Successfully", 12000, ct);
+        }
     }
 
     private static void Send(SerialPort port, string s) => port.Write(s);
@@ -201,24 +281,46 @@ public class MainForm : Form
 
     private void ToggleUi(bool enabled)
     {
-        if (InvokeRequired) { BeginInvoke(() => ToggleUi(enabled)); return; }
-        _btnStart.Enabled = enabled;
-        _btnRefresh.Enabled = enabled;
-        _btnBrowse.Enabled = enabled;
-        _btnCancel.Enabled = !enabled;
-        _cbPort.Enabled = enabled;
-        _cbBaud.Enabled = enabled;
+        Ui(() =>
+        {
+            _btnStart.Enabled = enabled;
+            _btnRefresh.Enabled = enabled;
+            _btnBrowse.Enabled = enabled;
+            _btnConnect.Enabled = enabled;
+            _btnCancel.Enabled = !enabled;
+            _cbPort.Enabled = enabled;
+            _cbBaud.Enabled = enabled;
+        });
     }
 
-    private void SetProgress(int value)
-    {
-        if (InvokeRequired) { BeginInvoke(() => SetProgress(value)); return; }
-        _progress.Value = Math.Clamp(value, 0, 100);
-    }
+    private void SetProgress(int value) => Ui(() => _progress.Value = Math.Clamp(value, 0, 100));
 
     private void Log(string msg)
     {
-        if (InvokeRequired) { BeginInvoke(() => Log(msg)); return; }
-        _tbLog.AppendText($"[{DateTime.Now:HH:mm:ss}] {msg}{Environment.NewLine}");
+        Ui(() => _tbLog.AppendText($"[{DateTime.Now:HH:mm:ss}] {msg}{Environment.NewLine}"));
+    }
+
+    private void SaveSettings()
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(SettingsPath)!;
+            Directory.CreateDirectory(dir);
+            var s = new AppSettings { LastBinPath = _tbFile.Text };
+            File.WriteAllText(SettingsPath, JsonSerializer.Serialize(s));
+        }
+        catch { }
+    }
+
+    private void LoadSettings()
+    {
+        try
+        {
+            if (!File.Exists(SettingsPath)) return;
+            var s = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath));
+            if (!string.IsNullOrWhiteSpace(s?.LastBinPath))
+                _tbFile.Text = s.LastBinPath;
+        }
+        catch { }
     }
 }
