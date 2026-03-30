@@ -253,12 +253,14 @@ public class MainForm : Form
         var sb = new StringBuilder();
         var line = new StringBuilder();
         long nextSpaceMs = 0;
+        bool spaceInjection = true;
+        bool bootSeenLogged = false;
 
         while (sw.ElapsedMilliseconds < 9000)
         {
             ct.ThrowIfCancellationRequested();
 
-            if (sw.ElapsedMilliseconds >= nextSpaceMs)
+            if (spaceInjection && sw.ElapsedMilliseconds >= nextSpaceMs)
             {
                 Send(port, " ");
                 nextSpaceMs = sw.ElapsedMilliseconds + 120;
@@ -298,13 +300,26 @@ public class MainForm : Form
                 }
                 if (s.Contains("Input Password", StringComparison.OrdinalIgnoreCase))
                 {
+                    // Stop injecting spaces once password prompt is reached.
+                    spaceInjection = false;
                     Log("[IAP] boot/menu text detected: input-password");
                     return "Input Password";
                 }
-                if (s.Contains("Booting", StringComparison.OrdinalIgnoreCase) ||
-                    s.Contains("Serial KEY [space] pressed", StringComparison.OrdinalIgnoreCase))
+                if (s.Contains("Serial KEY [space] pressed", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Space was accepted; stop injecting further spaces to avoid
+                    // polluting password input buffer.
+                    spaceInjection = false;
+                    if (!bootSeenLogged)
+                    {
+                        Log("[IAP] space accepted, waiting password prompt...");
+                        bootSeenLogged = true;
+                    }
+                }
+                else if (s.Contains("Booting", StringComparison.OrdinalIgnoreCase) && !bootSeenLogged)
                 {
                     Log("[IAP] boot countdown detected.");
+                    bootSeenLogged = true;
                 }
             }
             catch (TimeoutException) { }
@@ -423,12 +438,12 @@ public class MainForm : Form
 
             if (first.Contains("Input Password", StringComparison.OrdinalIgnoreCase))
             {
-                Send(port, Password + "\r\n");
+                Send(port, Password + "\r");
                 string pw = WaitAnyContains(port, 6000, ct, "Main Menu", "Wrong Password");
                 if (pw.Contains("Wrong Password", StringComparison.OrdinalIgnoreCase))
                 {
                     // one immediate retry for occasional line corruption
-                    Send(port, Password + "\r\n");
+                    Send(port, Password + "\r");
                     WaitContains(port, "Main Menu", 6000, ct);
                 }
                 Send(port, "1");
