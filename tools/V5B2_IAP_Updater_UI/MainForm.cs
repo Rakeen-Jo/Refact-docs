@@ -237,12 +237,29 @@ public class MainForm : Form
             port.DiscardOutBuffer();
             Log($"[IAP] using {port.PortName} @ {port.BaudRate}");
 
-            Send(port, " ");
-            WaitContains(port, "Input Password", 6000, ct);
-            Send(port, Password + "\r");
-            WaitContains(port, "Main Menu", 6000, ct);
-            Send(port, "1");
-            WaitContains(port, "Waiting for the file", 6000, ct);
+            // Boot-break robustness: spam SPACE during a short window.
+            // If app already in menu/password state, token matcher below handles it.
+            for (int i = 0; i < 20; i++)
+            {
+                Send(port, " ");
+                Thread.Sleep(50);
+            }
+
+            string first = WaitAnyContains(port, 9000, ct, "Input Password", "Main Menu", "Waiting for the file");
+
+            if (first.Contains("Input Password", StringComparison.OrdinalIgnoreCase))
+            {
+                Send(port, Password + "\r");
+                WaitContains(port, "Main Menu", 6000, ct);
+                Send(port, "1");
+                WaitContains(port, "Waiting for the file", 6000, ct);
+            }
+            else if (first.Contains("Main Menu", StringComparison.OrdinalIgnoreCase))
+            {
+                Send(port, "1");
+                WaitContains(port, "Waiting for the file", 6000, ct);
+            }
+            // else: already waiting for file
 
             var y = new YModemSender(port, Log, SetProgress);
             y.SendFile(filePath, ct);
@@ -254,6 +271,11 @@ public class MainForm : Form
     private static void Send(SerialPort port, string s) => port.Write(s);
 
     private void WaitContains(SerialPort port, string token, int timeoutMs, CancellationToken ct)
+    {
+        _ = WaitAnyContains(port, timeoutMs, ct, token);
+    }
+
+    private string WaitAnyContains(SerialPort port, int timeoutMs, CancellationToken ct, params string[] tokens)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var sb = new StringBuilder();
@@ -267,16 +289,20 @@ public class MainForm : Form
                 if (b < 0) continue;
                 sb.Append((char)b);
                 if (sb.Length > 16000) sb.Remove(0, sb.Length - 8000);
-                if (sb.ToString().Contains(token, StringComparison.OrdinalIgnoreCase))
+                string hay = sb.ToString();
+                foreach (var token in tokens)
                 {
-                    Log($"[IAP] token ok: {token}");
-                    return;
+                    if (hay.Contains(token, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Log($"[IAP] token ok: {token}");
+                        return token;
+                    }
                 }
             }
             catch (TimeoutException) { }
         }
 
-        throw new TimeoutException($"Timeout waiting token: {token}");
+        throw new TimeoutException($"Timeout waiting token: {string.Join(" | ", tokens)}");
     }
 
     private void ToggleUi(bool enabled)
