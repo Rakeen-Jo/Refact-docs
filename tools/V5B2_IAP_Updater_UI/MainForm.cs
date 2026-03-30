@@ -439,7 +439,18 @@ public class MainForm : Form
             if (first.Contains("Input Password", StringComparison.OrdinalIgnoreCase))
             {
                 SendPassword(port);
-                string pw = WaitAnyContains(port, 8000, ct, "Main Menu", "Wrong Password");
+                string pw;
+                try
+                {
+                    pw = WaitAnyContains(port, 5000, ct, "Main Menu", "Wrong Password");
+                }
+                catch (TimeoutException)
+                {
+                    // If password chars were accepted but terminator got lost, nudge with CR.
+                    Send(port, "\r");
+                    pw = WaitAnyContains(port, 4000, ct, "Main Menu", "Wrong Password");
+                }
+
                 if (pw.Contains("Wrong Password", StringComparison.OrdinalIgnoreCase))
                 {
                     // one immediate retry for occasional line corruption
@@ -469,14 +480,19 @@ public class MainForm : Form
     {
         // Remove residual spaces/newlines that may have been injected during boot-break.
         try { port.DiscardInBuffer(); } catch { }
-        Thread.Sleep(30);
+        Thread.Sleep(80); // allow prompt printing to settle
 
         foreach (char ch in Password)
         {
             Send(port, ch.ToString());
-            Thread.Sleep(4);
+            Thread.Sleep(12);
         }
+
+        // Some targets/sample IAPs are picky about line termination timing.
         Send(port, "\r");
+        Thread.Sleep(40);
+        Send(port, "\n");
+
         Log("[IAP] password sent");
     }
 
