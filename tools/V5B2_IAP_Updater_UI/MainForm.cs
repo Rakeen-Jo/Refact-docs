@@ -21,6 +21,7 @@ public class MainForm : Form
 
     private CancellationTokenSource? _cts;
     private SerialPort? _openedPort;
+    private SerialMonitorForm? _monitorForm;
 
     private const string Password = "wonik1234";
     private const string ResetCmd = "RESET";
@@ -171,8 +172,15 @@ public class MainForm : Form
 
     private void OpenMonitor()
     {
-        var mon = new SerialMonitorForm(() => _openedPort);
-        mon.Show(this);
+        if (_monitorForm is { IsDisposed: false })
+        {
+            _monitorForm.Focus();
+            return;
+        }
+
+        _monitorForm = new SerialMonitorForm(() => _openedPort);
+        _monitorForm.FormClosed += (_, _) => _monitorForm = null;
+        _monitorForm.Show(this);
     }
 
     private void TogglePortOpenClose()
@@ -237,10 +245,8 @@ public class MainForm : Form
 
         string cmd = ResetCmd;
         Send(port, cmd + "\r\n");
-        Thread.Sleep(80);
-        Send(port, cmd + "\r\n");
-        Thread.Sleep(350);
-        Log($"[IAP] reset cmd sent x2: {cmd}");
+        Thread.Sleep(450);
+        Log($"[IAP] reset cmd sent: {cmd}");
 
         // Watch boot text and inject SPACE on boot window.
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -326,6 +332,7 @@ public class MainForm : Form
         ToggleUi(false);
         _progress.Value = 0;
         _cts = new CancellationTokenSource();
+        _monitorForm?.SetPaused(true); // prevent read-stealing during update flow
 
         try
         {
@@ -345,6 +352,7 @@ public class MainForm : Form
         }
         finally
         {
+            _monitorForm?.SetPaused(false);
             _cts.Dispose();
             _cts = null;
             ToggleUi(true);
@@ -400,8 +408,14 @@ public class MainForm : Form
 
             if (first.Contains("Input Password", StringComparison.OrdinalIgnoreCase))
             {
-                Send(port, Password + "\r");
-                WaitContains(port, "Main Menu", 6000, ct);
+                Send(port, Password + "\r\n");
+                string pw = WaitAnyContains(port, 6000, ct, "Main Menu", "Wrong Password");
+                if (pw.Contains("Wrong Password", StringComparison.OrdinalIgnoreCase))
+                {
+                    // one immediate retry for occasional line corruption
+                    Send(port, Password + "\r\n");
+                    WaitContains(port, "Main Menu", 6000, ct);
+                }
                 Send(port, "1");
                 WaitContains(port, "Waiting for the file", 6000, ct);
             }

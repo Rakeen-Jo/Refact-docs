@@ -6,6 +6,7 @@ namespace V5B2_IAP_Updater_UI;
 public sealed class SerialMonitorForm : Form
 {
     private readonly Func<SerialPort?> _portGetter;
+    private volatile bool _paused;
     private readonly RichTextBox _rxBox = new() { Dock = DockStyle.Fill, ReadOnly = true, Font = new Font("Consolas", 9f) };
     private readonly TextBox _txBox = new() { Dock = DockStyle.Fill };
     private readonly Button _sendBtn = new() { Text = "Send", Dock = DockStyle.Fill };
@@ -47,8 +48,11 @@ public sealed class SerialMonitorForm : Form
         FormClosing += (_, _) => _pollTimer.Stop();
     }
 
+    public void SetPaused(bool paused) => _paused = paused;
+
     private void PollSerial()
     {
+        if (_paused) return;
         var p = _portGetter();
         if (p is null || !p.IsOpen) return;
 
@@ -63,8 +67,7 @@ public sealed class SerialMonitorForm : Form
 
             if (!string.IsNullOrEmpty(incoming))
             {
-                bool stickToBottom = (_rxBox.SelectionStart >= _rxBox.TextLength - 8) ||
-                                    (_rxBox.GetPositionFromCharIndex(_rxBox.TextLength).Y - _rxBox.ClientSize.Height < 24);
+                bool stickToBottom = (_rxBox.SelectionStart >= _rxBox.TextLength - 8);
 
                 _rxBox.AppendText(incoming);
 
