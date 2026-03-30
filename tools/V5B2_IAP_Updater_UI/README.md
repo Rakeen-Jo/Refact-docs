@@ -3,6 +3,7 @@
 기능:
 - COM 포트 자동 인식 + 목록 선택
 - Open/Close Port 토글 버튼 (선점/열기 실패 메시지)
+- Debug Monitor 팝업(실시간 RX 보기 + TX 입력/전송)
 - Baud 선택 (기본 921600)
 - BIN 파일 로컬 선택
 - 마지막 BIN 경로 자동 저장/복원

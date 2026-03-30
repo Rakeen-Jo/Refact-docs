@@ -12,6 +12,7 @@ public class MainForm : Form
     private readonly TextBox _tbFile = new() { ReadOnly = true };
     private readonly Button _btnRefresh = new() { Text = "Refresh" };
     private readonly Button _btnConnect = new() { Text = "Open Port" };
+    private readonly Button _btnMonitor = new() { Text = "Debug Monitor" };
     private readonly Button _btnBrowse = new() { Text = "Browse BIN" };
     private readonly Button _btnStart = new() { Text = "Start Download" };
     private readonly Button _btnCancel = new() { Text = "Cancel", Enabled = false };
@@ -97,6 +98,7 @@ public class MainForm : Form
         _tbFile.Dock = DockStyle.Fill;
         _btnRefresh.Dock = DockStyle.Fill;
         _btnConnect.Dock = DockStyle.Fill;
+        _btnMonitor.Dock = DockStyle.Fill;
         _btnBrowse.Dock = DockStyle.Fill;
         _btnStart.Dock = DockStyle.Fill;
         _btnCancel.Dock = DockStyle.Fill;
@@ -111,6 +113,7 @@ public class MainForm : Form
 
         layout.Controls.Add(lblBaud, 0, 1);
         layout.Controls.Add(_cbBaud, 1, 1);
+        layout.Controls.Add(_btnMonitor, 2, 1);
 
         layout.Controls.Add(lblBin, 0, 2);
         layout.Controls.Add(_tbFile, 1, 2);
@@ -141,6 +144,7 @@ public class MainForm : Form
 
         _btnRefresh.Click += (_, _) => RefreshPorts();
         _btnConnect.Click += (_, _) => TogglePortOpenClose();
+        _btnMonitor.Click += (_, _) => OpenMonitor();
         _btnBrowse.Click += (_, _) => BrowseBin();
         _btnStart.Click += async (_, _) => await StartAsync();
         _btnCancel.Click += (_, _) => _cts?.Cancel();
@@ -163,6 +167,12 @@ public class MainForm : Form
         _cbPort.Items.Clear();
         foreach (var p in SerialPort.GetPortNames().OrderBy(x => x)) _cbPort.Items.Add(p);
         if (_cbPort.Items.Count > 0) _cbPort.SelectedIndex = 0;
+    }
+
+    private void OpenMonitor()
+    {
+        var mon = new SerialMonitorForm(() => _openedPort);
+        mon.Show(this);
     }
 
     private void TogglePortOpenClose()
