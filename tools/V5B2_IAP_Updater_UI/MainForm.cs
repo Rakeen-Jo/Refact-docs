@@ -22,7 +22,7 @@ public class MainForm : Form
     private SerialPort? _openedPort;
 
     private const string Password = "wonik1234";
-    private const string ResetCmd = "reset";
+    private const string ResetCmd = "RESET";
 
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -217,7 +217,7 @@ public class MainForm : Form
     private void AutoEnterIap(SerialPort port, CancellationToken ct)
     {
         string cmd = ResetCmd;
-        Send(port, cmd + "\r");
+        Send(port, cmd + "\r\n");
         Thread.Sleep(120);
         Log($"[IAP] reset cmd sent: {cmd}");
 

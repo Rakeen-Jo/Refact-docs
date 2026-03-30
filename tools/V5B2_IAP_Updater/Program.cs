@@ -51,6 +51,8 @@ internal static class Program
                 {
                     Console.WriteLine($"[IAP] attempt {attempt}/{maxAttempts}");
 
+                    SendText(port, "RESET\r\n");
+                    Thread.Sleep(120);
                     for (int i = 0; i < 20; i++) { SendText(port, " "); Thread.Sleep(50); }
 
                     string first = WaitAnyContains(port, 9000, "Input Password", "Main Menu", "Waiting for the file");
