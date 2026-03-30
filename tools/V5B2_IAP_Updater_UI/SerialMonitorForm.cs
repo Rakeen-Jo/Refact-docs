@@ -11,6 +11,8 @@ public sealed class SerialMonitorForm : Form
     private readonly Button _sendBtn = new() { Text = "Send", Dock = DockStyle.Fill };
     private readonly CheckBox _crlf = new() { Text = "CRLF", Checked = true, AutoSize = true };
     private readonly System.Windows.Forms.Timer _pollTimer = new() { Interval = 50 };
+    private DateTime _lastTxAt = DateTime.MinValue;
+    private string _lastTx = string.Empty;
 
     public SerialMonitorForm(Func<SerialPort?> portGetter)
     {
@@ -74,15 +76,28 @@ public sealed class SerialMonitorForm : Form
         var p = _portGetter();
         if (p is null || !p.IsOpen) return;
 
-        var text = _txBox.Text;
+        var text = _txBox.Text.Trim();
         if (string.IsNullOrEmpty(text)) return;
+
+        // Debounce accidental duplicated Enter/Click within short window.
+        var now = DateTime.UtcNow;
+        if (text == _lastTx && (now - _lastTxAt).TotalMilliseconds < 180)
+            return;
 
         try
         {
             lock (p)
             {
+                // Command-boundary preamble helps parser resync when previous line ended oddly.
+                p.Write("\r");
+                Thread.Sleep(4);
                 p.Write(_crlf.Checked ? text + "\r\n" : text);
             }
+
+            _lastTx = text;
+            _lastTxAt = now;
+
+            _rxBox.AppendText($"\r\n>> {text}\r\n");
             _txBox.Clear();
         }
         catch { }
