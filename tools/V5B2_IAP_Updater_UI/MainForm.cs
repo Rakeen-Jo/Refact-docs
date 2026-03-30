@@ -234,25 +234,62 @@ public class MainForm : Form
         {
             lock (_openedPort)
             {
-                string cmd = _tbResetCmd.Text?.Trim() ?? string.Empty;
-                if (!string.IsNullOrEmpty(cmd))
-                {
-                    Send(_openedPort, cmd + "\r");
-                    Thread.Sleep(120);
-                    Log($"[IAP] reset cmd sent: {cmd}");
-                }
-                for (int i = 0; i < 20; i++)
-                {
-                    Send(_openedPort, " ");
-                    Thread.Sleep(50);
-                }
-                Log("[IAP] space burst sent.");
+                AutoEnterIap(_openedPort, CancellationToken.None);
             }
         }
         catch (Exception ex)
         {
             Log("[ERR] Enter IAP failed: " + ex.Message);
         }
+    }
+
+    private void AutoEnterIap(SerialPort port, CancellationToken ct)
+    {
+        string cmd = _tbResetCmd.Text?.Trim() ?? string.Empty;
+        if (!string.IsNullOrEmpty(cmd))
+        {
+            Send(port, cmd + "\r");
+            Thread.Sleep(120);
+            Log($"[IAP] reset cmd sent: {cmd}");
+        }
+
+        // Watch boot text and inject SPACE on "Booting" prompt.
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var sb = new StringBuilder();
+        long nextSpaceMs = 0;
+
+        while (sw.ElapsedMilliseconds < 7000)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (sw.ElapsedMilliseconds >= nextSpaceMs)
+            {
+                Send(port, " ");
+                nextSpaceMs = sw.ElapsedMilliseconds + 150;
+            }
+
+            try
+            {
+                int b = port.ReadByte();
+                if (b < 0) continue;
+                sb.Append((char)b);
+                if (sb.Length > 4000) sb.Remove(0, sb.Length - 2000);
+
+                string s = sb.ToString();
+                if (s.Contains("Booting", StringComparison.OrdinalIgnoreCase) ||
+                    s.Contains("Serial KEY [space] pressed", StringComparison.OrdinalIgnoreCase) ||
+                    s.Contains("Input Password", StringComparison.OrdinalIgnoreCase) ||
+                    s.Contains("Main Menu", StringComparison.OrdinalIgnoreCase) ||
+                    s.Contains("Waiting for the file", StringComparison.OrdinalIgnoreCase))
+                {
+                    Log("[IAP] boot/menu text detected.");
+                    return;
+                }
+            }
+            catch (TimeoutException) { }
+        }
+
+        Log("[IAP] auto-enter window elapsed (continuing with token wait)...");
     }
 
     private void BrowseBin()
@@ -351,22 +388,8 @@ public class MainForm : Form
             port.DiscardOutBuffer();
             Log($"[IAP] using {port.PortName} @ {port.BaudRate}");
 
-            // Try app-side soft reset command first (optional)
-            string cmd = _tbResetCmd.Text?.Trim() ?? string.Empty;
-            if (!string.IsNullOrEmpty(cmd))
-            {
-                Send(port, cmd + "\r");
-                Thread.Sleep(120);
-                Log($"[IAP] reset cmd sent: {cmd}");
-            }
-
-            // Boot-break robustness: spam SPACE during a short window.
-            // If app already in menu/password state, token matcher below handles it.
-            for (int i = 0; i < 24; i++)
-            {
-                Send(port, " ");
-                Thread.Sleep(50);
-            }
+            // Auto-enter IAP: reset command + boot text watch + space injection
+            AutoEnterIap(port, ct);
 
             string first = WaitAnyContains(port, 12000, ct, "Input Password", "Main Menu", "Waiting for the file");
 
