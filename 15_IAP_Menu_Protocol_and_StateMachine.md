@@ -58,7 +58,11 @@
 - 중간 전송 실패: YMODEM cancel(0x18,0x18) 후 재시작
 
 ## 구현 체크리스트
-- [ ] COM 포트/baud 선택 가능
-- [ ] 로그 창(raw serial) 저장
-- [ ] 상태 전이 타임아웃 configurable
+- [x] COM 포트/baud 선택 가능 (UI 버전 추가)
+- [x] 로그 창 표시
+- [x] 상태 전이 타임아웃 기반 동작
 - [ ] update 완료 후 자동 reset(선택)
+
+## 구현 산출물
+- 콘솔 버전: `tools/V5B2_IAP_Updater/`
+- UI 버전(WinForms): `tools/V5B2_IAP_Updater_UI/`
