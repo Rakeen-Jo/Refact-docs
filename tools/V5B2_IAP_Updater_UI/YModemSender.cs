@@ -62,7 +62,7 @@ internal sealed class YModemSender
         {
             ct.ThrowIfCancellationRequested();
             int remain = file.Length - offset;
-            int size = remain >= 1024 ? 1024 : 128;
+            int size = 128; // conservative mode for robustness (less burst, fewer long stalls)
             byte[] chunk = new byte[size];
             Array.Copy(file, offset, chunk, 0, Math.Min(size, remain));
             if (remain < size)
@@ -75,7 +75,7 @@ internal sealed class YModemSender
                 try
                 {
                     SendDataPacket(pktNo, chunk);
-                    byte r = ReadByteWithTimeout(8000, ct);
+                    byte r = ReadByteWithTimeout(12000, ct);
                     if (r == ACK)
                     {
                         acked = true;
@@ -96,6 +96,7 @@ internal sealed class YModemSender
             }
             if (!acked) throw new Exception($"Data block {pktNo} ACK failed after retries", pktErr);
 
+            Thread.Sleep(1);
             offset += size;
             pktNo = (pktNo + 1) & 0xFF;
             int pct = (int)((offset * 100L) / file.Length);
@@ -149,9 +150,9 @@ internal sealed class YModemSender
 
     private void ExpectAckThenC(CancellationToken ct)
     {
-        byte a = ReadByteWithTimeout(6000, ct);
+        byte a = ReadByteWithTimeout(12000, ct);
         if (a != ACK) throw new Exception($"Expected ACK, got 0x{a:X2}");
-        byte c = ReadByteWithTimeout(6000, ct);
+        byte c = ReadByteWithTimeout(12000, ct);
         if (c != CRC16) throw new Exception($"Expected 'C', got 0x{c:X2}");
     }
 
