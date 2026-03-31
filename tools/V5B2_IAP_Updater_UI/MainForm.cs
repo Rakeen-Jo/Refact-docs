@@ -446,7 +446,7 @@ public class MainForm : Form
                 try
                 {
                     first = WaitAnyContains(port, 12000, ct, "Input Password", "Main Menu", "Waiting for the file");
-                SetStage(25);
+                    SetStage(25);
                 }
                 catch (TimeoutException)
                 {
@@ -461,6 +461,15 @@ public class MainForm : Form
                         throw;
                     }
                 }
+            }
+
+            if (_cbUseIap2.Checked && first.Contains("Waiting for the file", StringComparison.OrdinalIgnoreCase))
+            {
+                Log("[IAP2] currently in YMODEM wait mode; abort and return to menu...");
+                Send(port, "a");
+                Thread.Sleep(80);
+                Send(port, "\x18\x18");
+                first = WaitAnyContains(port, 8000, ct, "Main Menu", "Input Password");
             }
 
             if (first.Contains("Input Password", StringComparison.OrdinalIgnoreCase))
