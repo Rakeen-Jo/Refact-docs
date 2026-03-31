@@ -54,28 +54,6 @@ public class MainForm : Form
         };
 
         var header = new Panel { Dock = DockStyle.Fill, Height = 72, BackColor = Color.White };
-        var logoPath = Path.Combine(AppContext.BaseDirectory, "assets", "wonik_symbol.png");
-        if (File.Exists(logoPath))
-        {
-            var pic = new PictureBox
-            {
-                Image = Image.FromFile(logoPath),
-                SizeMode = PictureBoxSizeMode.Zoom,
-                Location = new Point(12, 10),
-                Size = new Size(52, 52)
-            };
-            header.Controls.Add(pic);
-        }
-
-        var title = new Label
-        {
-            Text = "V5B2 IAP Updater",
-            Font = new Font("Segoe UI", 16, FontStyle.Bold),
-            ForeColor = Color.FromArgb(0, 56, 140),
-            AutoSize = true,
-            Location = new Point(76, 22)
-        };
-        header.Controls.Add(title);
 
         var wordmarkPath = Path.Combine(AppContext.BaseDirectory, "assets", "wonik_wordmark.jpg");
         if (File.Exists(wordmarkPath))
@@ -84,11 +62,21 @@ public class MainForm : Form
             {
                 Image = Image.FromFile(wordmarkPath),
                 SizeMode = PictureBoxSizeMode.Zoom,
-                Location = new Point(290, 16),
+                Location = new Point(12, 16),
                 Size = new Size(180, 40)
             };
             header.Controls.Add(wordmark);
         }
+
+        var title = new Label
+        {
+            Text = "V5B2 IAP Updater",
+            Font = new Font("Segoe UI", 16, FontStyle.Bold),
+            ForeColor = Color.FromArgb(0, 56, 140),
+            AutoSize = true,
+            Location = new Point(205, 22)
+        };
+        header.Controls.Add(title);
 
         var layout = new TableLayoutPanel
         {
