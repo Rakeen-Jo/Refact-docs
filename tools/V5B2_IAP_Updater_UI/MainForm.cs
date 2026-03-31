@@ -15,6 +15,7 @@ public class MainForm : Form
     private readonly Button _btnMonitor = new() { Text = "Debug Monitor" };
     private readonly Button _btnBrowse = new() { Text = "Browse BIN" };
     private readonly Button _btnStart = new() { Text = "Start Download" };
+    private readonly CheckBox _cbUseIap2 = new() { Text = "Use IAP2 (beta)", AutoSize = true, Checked = true };
     private readonly Button _btnCancel = new() { Text = "Cancel", Enabled = false };
     private readonly ProgressBar _stageProgress = new() { Minimum = 0, Maximum = 100 };
     private readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 100 };
@@ -106,6 +107,7 @@ public class MainForm : Form
         _btnBrowse.Dock = DockStyle.Fill;
         _btnStart.Dock = DockStyle.Fill;
         _btnCancel.Dock = DockStyle.Fill;
+        _cbUseIap2.Dock = DockStyle.Fill;
         _stageProgress.Dock = DockStyle.Fill;
         _progress.Dock = DockStyle.Fill;
         _tbLog.Dock = DockStyle.Fill;
@@ -123,7 +125,7 @@ public class MainForm : Form
 
         layout.Controls.Add(lblBin, 0, 2);
         layout.Controls.Add(_tbFile, 1, 2);
-        layout.SetColumnSpan(_tbFile, 2);
+        layout.Controls.Add(_cbUseIap2, 2, 2);
         layout.Controls.Add(_btnBrowse, 3, 2);
 
         layout.Controls.Add(_btnStart, 1, 3);
@@ -483,22 +485,32 @@ public class MainForm : Form
                     SendPassword(port);
                     WaitContains(port, "Main Menu", 8000, ct);
                 }
-                Send(port, "1");
-                WaitContains(port, "Waiting for the file", 6000, ct);
+                Send(port, _cbUseIap2.Checked ? "4" : "1");
+                WaitContains(port, _cbUseIap2.Checked ? "[IAP2]" : "Waiting for the file", 6000, ct);
             }
             else if (first.Contains("Main Menu", StringComparison.OrdinalIgnoreCase))
             {
-                Send(port, "1");
-                WaitContains(port, "Waiting for the file", 6000, ct);
+                Send(port, _cbUseIap2.Checked ? "4" : "1");
+                WaitContains(port, _cbUseIap2.Checked ? "[IAP2]" : "Waiting for the file", 6000, ct);
             }
-            // else: already waiting for file
+            // else: already waiting for file/ready
 
             SetStage(55); // transfer
-            var y = new YModemSender(port, Log, SetProgress);
-            y.SendFile(filePath, ct);
+            if (_cbUseIap2.Checked)
+            {
+                Log("[IAP] using IAP2 custom protocol");
+                var s = new Iap2Sender(port, Log, SetProgress);
+                s.SendFile(filePath, ct);
+            }
+            else
+            {
+                Log("[IAP] using legacy YMODEM protocol");
+                var y = new YModemSender(port, Log, SetProgress);
+                y.SendFile(filePath, ct);
 
-            SetStage(85); // finalize
-            WaitContains(port, "Programming Completed Successfully", 12000, ct);
+                SetStage(85); // finalize
+                WaitContains(port, "Programming Completed Successfully", 12000, ct);
+            }
             SetStage(100);
         }
     }
