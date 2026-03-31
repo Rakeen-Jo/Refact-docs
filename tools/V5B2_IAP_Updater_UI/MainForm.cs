@@ -54,25 +54,39 @@ public class MainForm : Form
         };
 
         var header = new Panel { Dock = DockStyle.Fill, Height = 72, BackColor = Color.White };
-        var logoPath = Path.Combine(AppContext.BaseDirectory, "assets", "wonik_mark.jpg");
+        var logoPath = Path.Combine(AppContext.BaseDirectory, "assets", "sign_en_h_copy.png");
         if (File.Exists(logoPath))
         {
             var pic = new PictureBox
             {
                 Image = Image.FromFile(logoPath),
                 SizeMode = PictureBoxSizeMode.Zoom,
-                Location = new Point(12, 8),
-                Size = new Size(220, 56)
+                Location = new Point(8, 6),
+                Size = new Size(360, 60)
             };
             header.Controls.Add(pic);
         }
+
+        var markPath = Path.Combine(AppContext.BaseDirectory, "assets", "sign_en_h.png");
+        if (File.Exists(markPath))
+        {
+            var mark = new PictureBox
+            {
+                Image = Image.FromFile(markPath),
+                SizeMode = PictureBoxSizeMode.Zoom,
+                Location = new Point(390, 14),
+                Size = new Size(44, 44)
+            };
+            header.Controls.Add(mark);
+        }
+
         var title = new Label
         {
             Text = "V5B2 IAP Updater",
             Font = new Font("Segoe UI", 16, FontStyle.Bold),
             ForeColor = Color.FromArgb(0, 56, 140),
             AutoSize = true,
-            Location = new Point(250, 22)
+            Location = new Point(442, 22)
         };
         header.Controls.Add(title);
 
@@ -571,7 +585,7 @@ public class MainForm : Form
     {
         try
         {
-            var logoPath = Path.Combine(AppContext.BaseDirectory, "assets", "wonik_mark.jpg");
+            var logoPath = Path.Combine(AppContext.BaseDirectory, "assets", "sign_en_h_copy.png");
             if (!File.Exists(logoPath)) return;
 
             using var bmp = new Bitmap(logoPath);
