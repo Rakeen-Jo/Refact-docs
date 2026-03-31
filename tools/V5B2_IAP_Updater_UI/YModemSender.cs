@@ -150,10 +150,33 @@ internal sealed class YModemSender
 
     private void ExpectAckThenC(CancellationToken ct)
     {
-        byte a = ReadByteWithTimeout(12000, ct);
+        // Some senders/receivers may emit extra 'C' (CRC request) before ACK.
+        // Be tolerant: ignore leading 'C' until ACK arrives.
+        byte a;
+        int guard = 0;
+        do
+        {
+            a = ReadByteWithTimeout(12000, ct);
+            if (++guard > 16) throw new Exception("ACK wait overflow");
+        } while (a == CRC16);
+
         if (a != ACK) throw new Exception($"Expected ACK, got 0x{a:X2}");
-        byte c = ReadByteWithTimeout(12000, ct);
-        if (c != CRC16) throw new Exception($"Expected 'C', got 0x{c:X2}");
+
+        // After ACK, receiver usually sends 'C' for next stage, but timing/order can vary.
+        // Accept immediate 'C'; otherwise continue (caller will handle subsequent flow).
+        try
+        {
+            byte c = ReadByteWithTimeout(2000, ct);
+            if (c != CRC16)
+            {
+                // Non-fatal: keep state machine tolerant.
+                _log($"[YMODEM] note: post-ACK byte 0x{c:X2} (expected 'C')");
+            }
+        }
+        catch (TimeoutException)
+        {
+            _log("[YMODEM] note: post-ACK 'C' timeout (tolerated)");
+        }
     }
 
     private void WaitByte(byte expected, int timeoutMs, CancellationToken ct)
