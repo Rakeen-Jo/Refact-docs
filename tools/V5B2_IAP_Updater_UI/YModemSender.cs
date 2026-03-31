@@ -27,14 +27,32 @@ internal sealed class YModemSender
         byte[] file = File.ReadAllBytes(filePath);
         string name = Path.GetFileName(filePath);
 
-        try { WaitByte(CRC16, 6000, ct); }
+        _log("[YMODEM] waiting initial 'C'...");
+        try { WaitByte(CRC16, 15000, ct); }
         catch (TimeoutException)
         {
             _log("[YMODEM] initial 'C' timeout; try sending block0 anyway");
         }
 
-        SendBlock0(name, file.Length);
-        ExpectAckThenC(ct);
+        bool block0Ok = false;
+        Exception? block0Err = null;
+        for (int i = 0; i < 3 && !block0Ok; i++)
+        {
+            try
+            {
+                _log($"[YMODEM] block0 tx try {i + 1}/3");
+                SendBlock0(name, file.Length);
+                ExpectAckThenC(ct);
+                block0Ok = true;
+            }
+            catch (Exception ex)
+            {
+                block0Err = ex;
+                _log($"[YMODEM] block0 handshake failed: {ex.Message}");
+                Thread.Sleep(120);
+            }
+        }
+        if (!block0Ok) throw new Exception("YMODEM block0 handshake failed", block0Err);
 
         int pktNo = 1;
         int offset = 0;
