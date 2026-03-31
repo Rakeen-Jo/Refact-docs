@@ -35,6 +35,8 @@ internal sealed class Iap2Sender
         byte[] file = File.ReadAllBytes(filePath);
         uint crc = Crc32(file);
 
+        try { _port.DiscardInBuffer(); } catch { }
+
         _log("[IAP2] HELLO");
         Exchange(HELLO, Array.Empty<byte>(), ct);
 
@@ -114,24 +116,52 @@ internal sealed class Iap2Sender
 
     private (byte type, ushort seq, byte[] payload) ReadFrame(CancellationToken ct)
     {
-        byte[] h = ReadExact(9, 3000, ct);
-        uint magic = BitConverter.ToUInt32(h, 0);
-        if (magic != MAGIC) throw new Exception("IAP2 bad magic");
-        byte type = h[4];
-        ushort seq = BitConverter.ToUInt16(h, 5);
-        ushort len = BitConverter.ToUInt16(h, 7);
-        byte[] tail = ReadExact(len + 2, 3000, ct);
-        byte[] whole = new byte[9 + len];
-        Array.Copy(h, 0, whole, 0, 9);
-        if (len > 0) Array.Copy(tail, 0, whole, 9, len);
+        // Stream-sync: skip any ASCII/banner bytes until we detect MAGIC.
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        uint shift = 0;
+        while (sw.ElapsedMilliseconds < 6000)
+        {
+            ct.ThrowIfCancellationRequested();
+            int v;
+            try
+            {
+                int old = _port.ReadTimeout;
+                _port.ReadTimeout = 200;
+                v = _port.ReadByte();
+                _port.ReadTimeout = old;
+            }
+            catch (TimeoutException)
+            {
+                continue;
+            }
 
-        ushort recv = (ushort)((tail[len] << 8) | tail[len + 1]);
-        ushort calc = Crc16(whole, 4, 5 + len);
-        if (recv != calc) throw new Exception("IAP2 bad crc");
+            if (v < 0) continue;
+            shift = (shift >> 8) | ((uint)(byte)v << 24); // rolling LE window
+            if (shift == MAGIC)
+            {
+                byte[] rest = ReadExact(5, 3000, ct); // type(1)+seq(2)+len(2)
+                byte type = rest[0];
+                ushort seq = BitConverter.ToUInt16(rest, 1);
+                ushort len = BitConverter.ToUInt16(rest, 3);
+                if (len > 2048) throw new Exception($"IAP2 invalid len {len}");
 
-        byte[] payload = new byte[len];
-        if (len > 0) Array.Copy(tail, 0, payload, 0, len);
-        return (type, seq, payload);
+                byte[] tail = ReadExact(len + 2, 5000, ct);
+                byte[] whole = new byte[9 + len];
+                BitConverter.GetBytes(MAGIC).CopyTo(whole, 0);
+                Array.Copy(rest, 0, whole, 4, 5);
+                if (len > 0) Array.Copy(tail, 0, whole, 9, len);
+
+                ushort recv = (ushort)((tail[len] << 8) | tail[len + 1]);
+                ushort calc = Crc16(whole, 4, 5 + len);
+                if (recv != calc) throw new Exception("IAP2 bad crc");
+
+                byte[] payload = new byte[len];
+                if (len > 0) Array.Copy(tail, 0, payload, 0, len);
+                return (type, seq, payload);
+            }
+        }
+
+        throw new TimeoutException("IAP2 frame sync timeout");
     }
 
     private byte[] ReadExact(int n, int timeoutMs, CancellationToken ct)
