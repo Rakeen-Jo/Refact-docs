@@ -54,30 +54,17 @@ public class MainForm : Form
         };
 
         var header = new Panel { Dock = DockStyle.Fill, Height = 72, BackColor = Color.White };
-        var logoPath = Path.Combine(AppContext.BaseDirectory, "assets", "sign_en_h_copy.png");
+        var logoPath = Path.Combine(AppContext.BaseDirectory, "assets", "wonik_symbol.png");
         if (File.Exists(logoPath))
         {
             var pic = new PictureBox
             {
                 Image = Image.FromFile(logoPath),
                 SizeMode = PictureBoxSizeMode.Zoom,
-                Location = new Point(8, 6),
-                Size = new Size(360, 60)
+                Location = new Point(12, 10),
+                Size = new Size(52, 52)
             };
             header.Controls.Add(pic);
-        }
-
-        var markPath = Path.Combine(AppContext.BaseDirectory, "assets", "sign_en_h.png");
-        if (File.Exists(markPath))
-        {
-            var mark = new PictureBox
-            {
-                Image = Image.FromFile(markPath),
-                SizeMode = PictureBoxSizeMode.Zoom,
-                Location = new Point(390, 14),
-                Size = new Size(44, 44)
-            };
-            header.Controls.Add(mark);
         }
 
         var title = new Label
@@ -86,7 +73,7 @@ public class MainForm : Form
             Font = new Font("Segoe UI", 16, FontStyle.Bold),
             ForeColor = Color.FromArgb(0, 56, 140),
             AutoSize = true,
-            Location = new Point(442, 22)
+            Location = new Point(76, 22)
         };
         header.Controls.Add(title);
 
@@ -585,7 +572,7 @@ public class MainForm : Form
     {
         try
         {
-            var logoPath = Path.Combine(AppContext.BaseDirectory, "assets", "sign_en_h_copy.png");
+            var logoPath = Path.Combine(AppContext.BaseDirectory, "assets", "wonik_symbol.png");
             if (!File.Exists(logoPath)) return;
 
             using var bmp = new Bitmap(logoPath);
