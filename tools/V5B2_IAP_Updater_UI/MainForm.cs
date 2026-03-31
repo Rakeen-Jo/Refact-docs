@@ -77,6 +77,19 @@ public class MainForm : Form
         };
         header.Controls.Add(title);
 
+        var wordmarkPath = Path.Combine(AppContext.BaseDirectory, "assets", "wonik_wordmark.jpg");
+        if (File.Exists(wordmarkPath))
+        {
+            var wordmark = new PictureBox
+            {
+                Image = Image.FromFile(wordmarkPath),
+                SizeMode = PictureBoxSizeMode.Zoom,
+                Location = new Point(290, 16),
+                Size = new Size(180, 40)
+            };
+            header.Controls.Add(wordmark);
+        }
+
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
