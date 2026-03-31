@@ -435,7 +435,23 @@ public class MainForm : Form
             if (string.IsNullOrEmpty(first))
             {
                 Log("[IAP] waiting for password/menu/file token...");
-                first = WaitAnyContains(port, 12000, ct, "Input Password", "Main Menu", "Waiting for the file");
+                try
+                {
+                    first = WaitAnyContains(port, 12000, ct, "Input Password", "Main Menu", "Waiting for the file");
+                }
+                catch (TimeoutException)
+                {
+                    // If bootloader is already in YMODEM receive mode, line may show repeated 'C'.
+                    if (DetectYmodemC(port, 500, ct))
+                    {
+                        first = "Waiting for the file";
+                        Log("[IAP] detected YMODEM 'C' burst -> treating as waiting-file");
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
             }
 
             if (first.Contains("Input Password", StringComparison.OrdinalIgnoreCase))
@@ -511,6 +527,32 @@ public class MainForm : Form
     private void WaitContains(SerialPort port, string token, int timeoutMs, CancellationToken ct)
     {
         _ = WaitAnyContains(port, timeoutMs, ct, token);
+    }
+
+    private bool DetectYmodemC(SerialPort port, int windowMs, CancellationToken ct)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        int cCount = 0;
+        while (sw.ElapsedMilliseconds < windowMs)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                int b = port.ReadByte();
+                if (b < 0) continue;
+                if (b == 'C')
+                {
+                    cCount++;
+                    if (cCount >= 3) return true;
+                }
+                else
+                {
+                    cCount = 0;
+                }
+            }
+            catch (TimeoutException) { }
+        }
+        return false;
     }
 
     private string WaitAnyContains(SerialPort port, int timeoutMs, CancellationToken ct, params string[] tokens)
