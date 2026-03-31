@@ -12,6 +12,7 @@ internal sealed class YModemSender
     private const byte STX = 0x02;
     private const byte EOT = 0x04;
     private const byte ACK = 0x06;
+    private const byte NAK = 0x15;
     private const byte CAN = 0x18;
     private const byte CRC16 = (byte)'C';
 
@@ -67,9 +68,33 @@ internal sealed class YModemSender
             if (remain < size)
                 Array.Fill<byte>(chunk, 0x1A, remain, size - remain);
 
-            SendDataPacket(pktNo, chunk);
-            byte r = ReadByteWithTimeout(6000, ct);
-            if (r != ACK) throw new Exception($"Data block {pktNo} not ACK: 0x{r:X2}");
+            bool acked = false;
+            Exception? pktErr = null;
+            for (int rtry = 0; rtry < 10 && !acked; rtry++)
+            {
+                try
+                {
+                    SendDataPacket(pktNo, chunk);
+                    byte r = ReadByteWithTimeout(8000, ct);
+                    if (r == ACK)
+                    {
+                        acked = true;
+                        break;
+                    }
+                    if (r == NAK)
+                    {
+                        _log($"[YMODEM] pkt {pktNo} NAK retry {rtry + 1}/10");
+                        continue;
+                    }
+                    pktErr = new Exception($"Data block {pktNo} unexpected resp: 0x{r:X2}");
+                }
+                catch (TimeoutException tex)
+                {
+                    pktErr = tex;
+                    _log($"[YMODEM] pkt {pktNo} ACK timeout retry {rtry + 1}/10");
+                }
+            }
+            if (!acked) throw new Exception($"Data block {pktNo} ACK failed after retries", pktErr);
 
             offset += size;
             pktNo = (pktNo + 1) & 0xFF;
