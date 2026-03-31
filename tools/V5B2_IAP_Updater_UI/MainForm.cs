@@ -16,6 +16,7 @@ public class MainForm : Form
     private readonly Button _btnBrowse = new() { Text = "Browse BIN" };
     private readonly Button _btnStart = new() { Text = "Start Download" };
     private readonly Button _btnCancel = new() { Text = "Cancel", Enabled = false };
+    private readonly ProgressBar _stageProgress = new() { Minimum = 0, Maximum = 100 };
     private readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 100 };
     private readonly TextBox _tbLog = new() { Multiline = true, ScrollBars = ScrollBars.Vertical, ReadOnly = true };
 
@@ -105,6 +106,7 @@ public class MainForm : Form
         _btnBrowse.Dock = DockStyle.Fill;
         _btnStart.Dock = DockStyle.Fill;
         _btnCancel.Dock = DockStyle.Fill;
+        _stageProgress.Dock = DockStyle.Fill;
         _progress.Dock = DockStyle.Fill;
         _tbLog.Dock = DockStyle.Fill;
         _tbLog.Font = new Font("Consolas", 9f);
@@ -117,6 +119,7 @@ public class MainForm : Form
         layout.Controls.Add(lblBaud, 0, 1);
         layout.Controls.Add(_cbBaud, 1, 1);
         layout.Controls.Add(_btnMonitor, 2, 1);
+        layout.Controls.Add(_stageProgress, 3, 1);
 
         layout.Controls.Add(lblBin, 0, 2);
         layout.Controls.Add(_tbFile, 1, 2);
@@ -359,6 +362,7 @@ public class MainForm : Form
         }
 
         ToggleUi(false);
+        _stageProgress.Value = 0;
         _progress.Value = 0;
         _cts = new CancellationTokenSource();
         _monitorForm?.SetPaused(true); // prevent read-stealing during update flow
@@ -369,6 +373,7 @@ public class MainForm : Form
             SaveSettings();
             await Task.Run(() => RunUpdateWithRetry(_openedPort!, file, _cts.Token));
             Log("[OK] Update completed.");
+            _stageProgress.Value = 100;
             _progress.Value = 100;
         }
         catch (OperationCanceledException)
@@ -429,6 +434,7 @@ public class MainForm : Form
             port.DiscardOutBuffer();
             Log($"[IAP] using {port.PortName} @ {port.BaudRate}");
 
+            SetStage(10); // enter/reset phase
             // Auto-enter IAP: reset command + boot text watch + space injection
             string first = AutoEnterIap(port, ct);
 
@@ -438,6 +444,7 @@ public class MainForm : Form
                 try
                 {
                     first = WaitAnyContains(port, 12000, ct, "Input Password", "Main Menu", "Waiting for the file");
+                SetStage(25);
                 }
                 catch (TimeoutException)
                 {
@@ -456,6 +463,7 @@ public class MainForm : Form
 
             if (first.Contains("Input Password", StringComparison.OrdinalIgnoreCase))
             {
+                SetStage(35); // auth/menu
                 SendPassword(port);
                 string pw;
                 try
@@ -485,10 +493,13 @@ public class MainForm : Form
             }
             // else: already waiting for file
 
+            SetStage(55); // transfer
             var y = new YModemSender(port, Log, SetProgress);
             y.SendFile(filePath, ct);
 
+            SetStage(85); // finalize
             WaitContains(port, "Programming Completed Successfully", 12000, ct);
+            SetStage(100);
         }
     }
 
@@ -602,6 +613,7 @@ public class MainForm : Form
     }
 
     private void SetProgress(int value) => Ui(() => _progress.Value = Math.Clamp(value, 0, 100));
+    private void SetStage(int value) => Ui(() => _stageProgress.Value = Math.Clamp(value, 0, 100));
 
     private void Log(string msg)
     {
