@@ -27,7 +27,11 @@ internal sealed class YModemSender
         byte[] file = File.ReadAllBytes(filePath);
         string name = Path.GetFileName(filePath);
 
-        WaitByte(CRC16, 6000, ct);
+        try { WaitByte(CRC16, 6000, ct); }
+        catch (TimeoutException)
+        {
+            _log("[YMODEM] initial 'C' timeout; try sending block0 anyway");
+        }
 
         SendBlock0(name, file.Length);
         ExpectAckThenC(ct);
@@ -46,7 +50,7 @@ internal sealed class YModemSender
                 Array.Fill<byte>(chunk, 0x1A, remain, size - remain);
 
             SendDataPacket(pktNo, chunk);
-            byte r = ReadByteWithTimeout(3000, ct);
+            byte r = ReadByteWithTimeout(6000, ct);
             if (r != ACK) throw new Exception($"Data block {pktNo} not ACK: 0x{r:X2}");
 
             offset += size;
@@ -64,7 +68,7 @@ internal sealed class YModemSender
         ExpectAckThenC(ct);
 
         SendFinalEmptyBlock0();
-        byte last = ReadByteWithTimeout(3000, ct);
+        byte last = ReadByteWithTimeout(6000, ct);
         if (last != ACK) throw new Exception($"Final ACK missing: 0x{last:X2}");
 
         _progress(100);
@@ -102,9 +106,9 @@ internal sealed class YModemSender
 
     private void ExpectAckThenC(CancellationToken ct)
     {
-        byte a = ReadByteWithTimeout(3000, ct);
+        byte a = ReadByteWithTimeout(6000, ct);
         if (a != ACK) throw new Exception($"Expected ACK, got 0x{a:X2}");
-        byte c = ReadByteWithTimeout(3000, ct);
+        byte c = ReadByteWithTimeout(6000, ct);
         if (c != CRC16) throw new Exception($"Expected 'C', got 0x{c:X2}");
     }
 

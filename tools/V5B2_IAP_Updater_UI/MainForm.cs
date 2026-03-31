@@ -244,7 +244,7 @@ public class MainForm : Form
         Thread.Sleep(20);
 
         string cmd = ResetCmd;
-        Send(port, cmd + "\r\n");
+        SendReset(port);
         Thread.Sleep(450);
         Log($"[IAP] reset cmd sent: {cmd}");
 
@@ -475,6 +475,16 @@ public class MainForm : Form
     }
 
     private static void Send(SerialPort port, string s) => port.Write(s);
+
+    private void SendReset(SerialPort port)
+    {
+        foreach (char ch in ResetCmd)
+        {
+            Send(port, ch.ToString());
+            Thread.Sleep(8);
+        }
+        Send(port, "\r");
+    }
 
     private void SendPassword(SerialPort port)
     {
